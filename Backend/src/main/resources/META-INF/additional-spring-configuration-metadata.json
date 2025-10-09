@@ -1,0 +1,47 @@
+{"properties": [
+  {
+    "name": "spring.mqtt.host",
+    "type": "java.lang.String",
+    "description": "A description for 'spring.mqtt.host'"
+  },
+  {
+    "name": "spring.mqtt.port",
+    "type": "java.lang.String",
+    "description": "A description for 'spring.mqtt.port'"
+  },
+  {
+    "name": "spring.mqtt.client_id",
+    "type": "java.lang.String",
+    "description": "A description for 'spring.mqtt.client_id'"
+  },
+  {
+    "name": "spring.application_id",
+    "type": "java.lang.String",
+    "description": "A description for 'spring.application_id'"
+  },
+  {
+    "name": "authentication.service.jwtSecret",
+    "type": "java.lang.String",
+    "description": "A description for 'authentication.service.jwtSecret'"
+  },
+  {
+    "name": "authentication.service.jwtExpirationTime",
+    "type": "java.lang.String",
+    "description": "A description for 'authentication.service.jwtExpirationTime'"
+  },
+  {
+    "name": "spring.model.host",
+    "type": "java.lang.String",
+    "description": "A description for 'spring.model.host'"
+  },
+  {
+    "name": "spring.model.port",
+    "type": "java.lang.String",
+    "description": "A description for 'spring.model.port'"
+  },
+  {
+    "name": "spring.model.api_key",
+    "type": "java.lang.String",
+    "description": "A description for 'spring.model.api_key'"
+  }
+]}

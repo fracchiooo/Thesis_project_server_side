@@ -1,0 +1,34 @@
+
+services:
+  backend:
+    build:
+          context: ./Backend
+          dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - MODEL_API_KEY=${MODEL_API_KEY:"default_api_key"}
+    networks:
+      - app-network
+
+  model:
+    build:
+      context: ./Model
+      dockerfile: Dockerfile
+    container_name: moodel_service
+    ports:
+      - "5000:5000"
+    environment:
+      - MODEL_API_KEY=${MODEL_API_KEY:"default_api_key"}
+    restart: unless-stopped
+    networks:
+      - app-network
+    volumes:
+      - ./data:/app/data
+
+
+
+networks:
+  app-network:
+    driver: bridge
