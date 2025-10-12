@@ -1,6 +1,11 @@
+# Web framework (NON sono preinstallati in tensorflow/tensorflow)
 Flask==3.0.0
 gunicorn==21.2.0
+
+# TensorFlow è già installato nell'immagine base
+# tensorflow==2.15.0  ← NON serve, già presente
+
+# Questi vanno installati
 numpy==1.24.3
-tensorflow==2.15.0
 tensorflow-probability==0.23.0
 matplotlib==3.8.2

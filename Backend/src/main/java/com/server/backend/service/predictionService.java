@@ -1,5 +1,6 @@
 package com.server.backend.service;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -12,11 +13,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import com.server.backend.dto.completePredictionDto;
-import com.server.backend.dto.dataForDatasetDto;
-import com.server.backend.dto.modelResponseDto;
-import com.server.backend.dto.predictResponseDto;
-import com.server.backend.dto.predictionDto;
+import com.server.backend.dto.CompletePredictionDto;
+import com.server.backend.dto.DataForDatasetDto;
+import com.server.backend.dto.ModelResponseDto;
+import com.server.backend.dto.PredictResponseDto;
+import com.server.backend.dto.PredictionDto;
 import com.server.backend.model.Prediction;
 import com.server.backend.repository.predictionRepository;
 import com.server.backend.repository.userRepository;
@@ -44,7 +45,7 @@ public class predictionService {
     private String apiKey;
 
 
-    public ResponseEntity<predictResponseDto> predict(predictionDto predDto) {
+    public ResponseEntity<PredictResponseDto> predict(PredictionDto predDto) {
         // TODO make call to the model microservice
         // TODO save the prediction in the database (without observed data)
         
@@ -57,10 +58,10 @@ public class predictionService {
 
         String predictUrl = "http://" + modelHost + ":" + modelPort + "/predict";
         // Make the POST request
-        ResponseEntity<modelResponseDto> res = restTemplate.exchange(predictUrl, HttpMethod.POST, requestEntity, modelResponseDto.class);
+        ResponseEntity<ModelResponseDto> res = restTemplate.exchange(predictUrl, HttpMethod.POST, requestEntity, ModelResponseDto.class);
 
         if (res.getStatusCode().is2xxSuccessful() && res.getBody() != null) {
-            modelResponseDto responseBody = res.getBody();
+            ModelResponseDto responseBody = res.getBody();
             if (responseBody!=null && responseBody.getStatus().equals("success")) {
                 // Extract the 'result' field which contains the prediction details
                 Map<String, Object> result = (Map<String, Object>) responseBody.getResult();
@@ -80,7 +81,7 @@ public class predictionService {
                 p = predictionRepo.save(p);
                 predictionRepo.flush();
 
-                predictResponseDto responseDto = new predictResponseDto();
+                PredictResponseDto responseDto = new PredictResponseDto();
                 responseDto.setId(p.getId());
                 responseDto.setTimestamp(p.getTimestamp());
                 responseDto.setPredictedConcentration(p.getPredictedConcentration());
@@ -102,7 +103,7 @@ public class predictionService {
 
 
 
-    public ResponseEntity<Object> completePrediction(Long id, completePredictionDto observed) {
+    public ResponseEntity<Object> completePrediction(Long id, CompletePredictionDto observed) {
         Prediction p = predictionRepo.findById(id).orElse(null);
         if (p == null) {
             return ResponseEntity.status(404).body("Prediction not found");
@@ -135,14 +136,14 @@ public class predictionService {
         headers.set("Authorization", apiKey);
 
         // Wrap the request payload in an HttpEntity with headers
-        HttpEntity<Object> requestEntity = new HttpEntity<>(null, headers);
+        HttpEntity<Object> requestEntity = new HttpEntity<>(new HashMap<>(), headers);
 
         String predictUrl = "http://" + modelHost + ":" + modelPort + "/train";
         // Make the POST request
-        ResponseEntity<modelResponseDto> res = restTemplate.exchange(predictUrl, HttpMethod.POST, requestEntity, modelResponseDto.class);
+        ResponseEntity<ModelResponseDto> res = restTemplate.exchange(predictUrl, HttpMethod.POST, requestEntity, ModelResponseDto.class);
 
         if (res.getStatusCode().is2xxSuccessful() && res.getBody() != null) {
-            modelResponseDto responseBody = res.getBody();
+            ModelResponseDto responseBody = res.getBody();
             if (responseBody!=null && responseBody.getStatus().equals("success")) {
                 return ResponseEntity.ok(responseBody.getResult());
             } else {
@@ -154,7 +155,7 @@ public class predictionService {
     }
 
 
-    public ResponseEntity<Object> addData(dataForDatasetDto dataDto) {
+    public ResponseEntity<Object> addData(DataForDatasetDto dataDto) {
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("Content-Type", "application/json");
@@ -165,10 +166,10 @@ public class predictionService {
 
         String predictUrl = "http://" + modelHost + ":" + modelPort + "/addData";
         // Make the POST request
-        ResponseEntity<modelResponseDto> res = restTemplate.exchange(predictUrl, HttpMethod.POST, requestEntity, modelResponseDto.class);
+        ResponseEntity<ModelResponseDto> res = restTemplate.exchange(predictUrl, HttpMethod.POST, requestEntity, ModelResponseDto.class);
         
         if (res.getStatusCode().is2xxSuccessful() && res.getBody() != null) {
-            modelResponseDto responseBody = res.getBody();
+            ModelResponseDto responseBody = res.getBody();
             if (responseBody!=null && responseBody.getStatus().equals("success")) {
                 return ResponseEntity.ok(responseBody.getResult());
             } else {

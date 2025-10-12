@@ -1,5 +1,7 @@
 package com.server.backend.dto;
 
+import java.util.Date;
+
 import jakarta.annotation.Nonnull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -8,24 +10,19 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class dataForDatasetDto {
-
-    @Nonnull
-    private Float initialConcentration;
+public class CommandDto {
 
     @Nonnull
     private Float frequency;
 
     @Nonnull
-    private Float dutyCycle;
-
-    @Nonnull
-    private Float timeLasted;
+    private Float duty_frequency;
 
     @Nonnull
     private Float temperature;
 
     @Nonnull
-    private Float observedConcentration;
+    private Float finish_after;
     
+    private Date startTime;    
 }

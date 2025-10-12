@@ -9,9 +9,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.server.backend.dto.loginDto;
-import com.server.backend.dto.userProfileRequestDto;
-import com.server.backend.dto.userProfileResponseDto;
+import com.server.backend.dto.LoginDto;
+import com.server.backend.dto.UserProfileRequestDto;
+import com.server.backend.dto.UserProfileResponseDto;
 import com.server.backend.service.userService;
 
 @RestController
@@ -23,9 +23,9 @@ public class userController {
 
 
     @PostMapping("/create")
-    public ResponseEntity<Object> createUser(@RequestBody userProfileRequestDto userProfileRequestDto) {
+    public ResponseEntity<Object> createUser(@RequestBody UserProfileRequestDto userProfileRequestDto) {
         try {
-            userProfileResponseDto createdProfile = userServ.createUserProfile(userProfileRequestDto);
+            UserProfileResponseDto createdProfile = userServ.createUserProfile(userProfileRequestDto);
             return new ResponseEntity<>(createdProfile, HttpStatus.CREATED);
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.NOT_ACCEPTABLE);
@@ -33,7 +33,7 @@ public class userController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<Object> login(@RequestBody loginDto loginDto) {
+    public ResponseEntity<Object> login(@RequestBody LoginDto loginDto) {
         System.out.println("sono nel controller, helo\n\n");
          return userServ.login(loginDto);
     }

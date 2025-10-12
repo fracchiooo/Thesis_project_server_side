@@ -1,6 +1,7 @@
 package com.server.backend.dto;
 
 import java.util.List;
+
 import com.server.backend.model.Device;
 import com.server.backend.model.Prediction;
 
@@ -11,7 +12,7 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class userProfileResponseDto {
+public class UserProfileResponseDto {
 
     private String username;
     private List<Device> devices;

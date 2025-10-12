@@ -6,13 +6,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.server.backend.dto.commandDto;
-import com.server.backend.dto.statusDto;
+import com.server.backend.dto.CommandDto;
+import com.server.backend.dto.StatusDto;
 import com.server.backend.service.deviceService;
 
 
@@ -25,7 +26,7 @@ public class deviceController {
 
 
     @PostMapping("/create")
-    public ResponseEntity<statusDto> createDevice(@RequestBody String devEUI) {        
+    public ResponseEntity<StatusDto> createDevice(@RequestBody String devEUI) {        
         return deviceServ.createDevice(devEUI);
     }
 
@@ -44,19 +45,19 @@ public class deviceController {
 
 
     
-    @PostMapping("/getStatus")
-    public ResponseEntity<statusDto> getStatus(@RequestBody String devEUI) {
-         return deviceServ.getStatus(devEUI);
+    @GetMapping("/getStatus/{devEUI}")
+    public ResponseEntity<StatusDto> getStatus(@PathVariable String devEUI) {
+        return deviceServ.getStatus(devEUI);
     }
 
     @GetMapping("/getAllStatusses")
-    public ResponseEntity<List<statusDto>> getAllStatusses() {
-         return deviceServ.getAllStatusses();
+    public ResponseEntity<List<StatusDto>> getAllStatusses() {
+        return deviceServ.getAllStatusses();
     }
 
-    @PostMapping("sendCommand")
-    public ResponseEntity<Object> sendCommand(@RequestBody commandDto commandDto) {        
-        return deviceServ.sendCommand(commandDto);
+    @PostMapping("sendCommand/{devEUI}")
+    public ResponseEntity<Object> sendCommand(@RequestBody CommandDto commandDto, @PathVariable String devEUI) {        
+        return deviceServ.sendCommand(commandDto, devEUI);
     }
     
     

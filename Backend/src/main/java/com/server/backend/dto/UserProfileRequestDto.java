@@ -1,7 +1,7 @@
 package com.server.backend.dto;
 
-import jakarta.annotation.Nonnull;
 
+import jakarta.annotation.Nonnull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -9,12 +9,12 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class loginDto {
-
-    @Nonnull
-    private String username;
+public class UserProfileRequestDto {
 
     @Nonnull
     private String password;
+    
+    @Nonnull
+    private String username;
     
 }

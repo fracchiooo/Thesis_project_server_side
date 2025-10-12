@@ -37,7 +37,7 @@ public class JWTAuthenticationFilter implements Filter{
 
 
          // Skip the filter for these paths
-        if ("/user/login".equals(httpRequest.getRequestURI())) {
+        if ("/user/create".equals(httpRequest.getRequestURI()) || "/user/login".equals(httpRequest.getRequestURI())) {
 
             chain.doFilter(request, response); 
             return;
@@ -50,9 +50,15 @@ public class JWTAuthenticationFilter implements Filter{
             httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Not setted any JWT token");
             return;
         }
+
+        if (token.startsWith("Bearer ")) {
+            token = token.substring(7); // rimuove "Bearer "
+        }
         System.out.println("the token of the user to be validated is "+token);
 
         boolean result = userServ.validateToken(token);
+        System.out.println("the result of the validation is: "+result);
+
         if(result){
             // Token is valid, proceed with the request
             String username = userServ.getUsernameFromToken(token);

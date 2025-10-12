@@ -10,6 +10,8 @@ import os
 from flask import Flask, request, jsonify
 from functools import wraps
 import threading
+import sys
+import logging
 
 tfd = tfp.distributions
 tfk = tf.keras
@@ -564,7 +566,6 @@ class GNN:
             }
         }
     
-
 class Model:
     def __init__(self, hyperparams=None, observed_data=[], mcmc_params=None, M=2):
 
@@ -604,57 +605,91 @@ class Model:
     def fit(self):
         """
         Train the model using MCMC inference
+        Returns dict with 'success' bool and 'message' or 'samples'
         """
-
         if len(self.observed_data)==0:
-            raise ValueError("Set a valid dataset when instanciating the class")
+            return {'success': False, 'message': 'No dataset provided'}
         
-        
-        # Executes MCMC inference
-        self.samples = self.gnn.mcmc_inference(
-            observed_data,
-            num_samples=self.mcmc_params['num_samples'],
-            burn_in=self.mcmc_params['burn_in'],
-            thin=self.mcmc_params['thin'] 
-        )
-        self.is_trained = True
-        
-        return self.samples
+        try:
+            # Executes MCMC inference
+            self.samples = self.gnn.mcmc_inference(
+                self.observed_data,
+                num_samples=self.mcmc_params['num_samples'],
+                burn_in=self.mcmc_params['burn_in'],
+                thin=self.mcmc_params['thin'] 
+            )
+            self.is_trained = True
+            return {'success': True, 'samples': len(self.samples)}
+        except Exception as e:
+            return {'success': False, 'message': str(e)}
     
     def predict(self, environmental_data, t, N_0):
-        """Predicts the Gompertz function with uncertainty estimation"""
+        """
+        Predicts the Gompertz function with uncertainty estimation
+        Returns dict with 'success' bool and 'message' or 'result'
+        """
         if not self.is_trained:
-            raise ValueError("Untrained model. Call fit() before predict().")
-            
-        return self.gnn.predict_with_uncertainty(environmental_data, t, N_0)
-
+            return {'success': False, 'message': 'Untrained model. Call fit() before predict.'}
+        
+        try:
+            result = self.gnn.predict_with_uncertainty(environmental_data, t, N_0)
+            return {'success': True, 'result': result}
+        except Exception as e:
+            return {'success': False, 'message': str(e)}
 
     def save_model(self, filepath):
-        """Saves the trained model to a file"""
+        """
+        Saves the trained model to a file
+        Returns dict with 'success' bool and 'message'
+        """
         if not self.is_trained:
-            raise ValueError("Untrained model. Call fit() before saving.")
+            return {'success': False, 'message': 'Untrained model. Call fit() before saving.'}
         
-        with open(filepath, 'wb') as f:
-            pickle.dump({
-                'gnn_state': self.gnn,
-                'samples': self.samples
-            }, f)
-        print(f"Model saved to {filepath}")
+        try:
+            with open(filepath, 'wb') as f:
+                pickle.dump({
+                    'mcmc_samples': self.gnn.mcmc_samples,
+                    'hyperparams': self.gnn.hyperparams,
+                    'hidden_units': self.gnn.HIDDEN_UNITS,
+                    'mcmc_params': self.mcmc_params
+                }, f)
+            print(f"Model saved to {filepath}")
+            return {'success': True, 'message': f'Model saved to {filepath}'}
+        except Exception as e:
+            return {'success': False, 'message': str(e)}
 
     
     def load_model(self, filepath):
-        """Loads a trained model from a file"""
+        """
+        Loads a trained model from a file
+        Returns dict with 'success' bool and 'message'
+        """
         try:
+            print(f"Attempting to load model from: {filepath}")
+            
             with open(filepath, 'rb') as f:
                 data = pickle.load(f)
-                self.gnn = data['gnn_state']
-                self.samples = data['samples']
+                
+                # Ricrea il GNN con i parametri salvati
+                self.gnn = GNN(
+                    hyperparams=data['hyperparams'],
+                    hidden_units=data['hidden_units']
+                )
+                self.gnn.mcmc_samples = data['mcmc_samples']
+                self.gnn.is_trained = True
+                
+                self.mcmc_params = data['mcmc_params']
                 self.is_trained = True
+                
                 print(f"Model loaded from {filepath}")
-                return 0
+                print(f"Loaded {len(self.gnn.mcmc_samples)} samples")
+                return {'success': True, 'message': f'Loaded {len(self.gnn.mcmc_samples)} samples'}
+                
         except Exception as e:
-            print(f"Error in loading the model")
-            return -1
+            print(f"Error loading model: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+            return {'success': False, 'message': str(e)}
 
 
 def normalize(value, min_val, max_val):
@@ -710,7 +745,12 @@ def test_train(test_data, model):
         N_0 = test['initial_pop']
         N_obs = test['observed_concentration']
         
-        prediction = model.predict(env_data, t, N_0)
+        pred_result = model.predict(env_data, t, N_0)
+        if not pred_result['success']:
+            print(f"Prediction error: {pred_result['message']}")
+            continue
+            
+        prediction = pred_result['result']
         pred_mean = prediction['gompertz']['mean']
         
         percent_error = abs(pred_mean - N_obs) / N_obs * 100
@@ -754,100 +794,277 @@ def test_train(test_data, model):
     mse = np.mean([e**2 for e in absolute_errors])
     return mse
 
-
-
 def load_dataset(filepath):
-
-    # WARNING: the input environmental data must be normalized between 0 and 1
     all_data = []
-    with open(filepath, newline='') as csvfile:
-        dialect = csv.Sniffer().sniff(csvfile.read(1024))
-        csvfile.seek(0)
-        reader = csv.reader(csvfile, dialect)
-        next(reader)
-        try:
-            for row_num, row in enumerate(reader, start=1):  # start=1 for first data row
-                data = row[:6]
+    
+    print(f"DEBUG: Opening {filepath}")
+    
+    with open(filepath, 'r', encoding='utf-8-sig', newline='') as csvfile:
+        reader = csv.reader(csvfile, delimiter=';')
+        
+        # Leggi header
+        header = next(reader)
+        print(f"DEBUG: Header = {header}")
+        
+        for row_num, row in enumerate(reader, start=2):
+            print(f"DEBUG: Row {row_num} raw = {row}")
+            
+            # Pulisci ogni cella
+            row = [cell.strip() for cell in row]
+            print(f"DEBUG: Row {row_num} cleaned = {row}")
+            
+            if not row or len(row) < 6:
+                print(f"DEBUG: Skipping row {row_num} - not enough columns")
+                continue
+            
+            if all(not cell for cell in row[:6]):
+                print(f"DEBUG: Skipping row {row_num} - all empty")
+                continue
+                
+            try:
                 single_data={'environmental':[], 'time':0.0, 'initial_pop':0.0, 'observed_concentration':0.0}
                 environmental_data=[]
-                environmental_data.append(normalize(float(row[0].replace(",",".")),0,1))
-                environmental_data.append(normalize(float(row[1].replace(",",".")),18,28))
-                environmental_data.append(normalize(float(row[2].replace(",", ".")),0,40))
+                environmental_data.append(normalize(float(row[0]), 0, 1))
+                environmental_data.append(normalize(float(row[1]), 18, 28))
+                environmental_data.append(normalize(float(row[2]), 0, 40))
                 single_data['environmental']=environmental_data
-                single_data['time']= float(row[4].replace(",","."))
-                single_data['initial_pop']= float(row[3].replace(",","."))
-                single_data['observed_concentration']= float(row[5].replace(",","."))
-                all_data.append(single_data)     
-        except csv.Error as e:
-            print(f'Error reading CSV file at line {reader.line_num}: {e}')
-            return []
+                single_data['time']= float(row[4])
+                single_data['initial_pop']= float(row[3])
+                single_data['observed_concentration']= float(row[5])
+                all_data.append(single_data)
+                print(f"DEBUG: Successfully added row {row_num}")
+            except (ValueError, IndexError) as e:
+                print(f'ERROR at row {row_num}: {e}, row: {row}')
+                continue
 
+    print(f"Loaded {len(all_data)} data points")
     return all_data
-    
 
 def append_row(filepath, data):
     """Appende una riga al file"""
-    with open(filepath, 'a', newline='') as f:
-        writer = csv.writer(f)
+    data = [str(cell).strip() for cell in data]
+    
+    with open(filepath, 'a', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f, delimiter=';')  # Virgola
         writer.writerow(data)
 
 
 def append_csv_to_csv(source_file, target_file):
-    with open(source_file, 'r', newline='') as source:
-        reader = csv.reader(source)
+    with open(source_file, 'r', newline='', encoding='utf-8-sig') as source:
+        reader = csv.reader(source, delimiter=';')  # Virgola
         
-        with open(target_file, 'a', newline='') as target:
-            writer = csv.writer(target)
+        with open(target_file, 'a', newline='', encoding='utf-8') as target:
+            writer = csv.writer(target, delimiter=';')  # Virgola
             for row in reader:
+                row = [cell.strip() for cell in row]
                 writer.writerow(row)
 
-    with open(source_file, 'w', newline='') as source:
-        # Clear the source file
+    # Svuota il file sorgente
+    with open(source_file, 'w', newline='', encoding='utf-8') as source:
         pass
 
-
 app = Flask(__name__)
-
+app.config['PROPAGATE_EXCEPTIONS'] = True 
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 # API Key
 API_KEY = os.environ.get('MODEL_API_KEY', 'default_api_key')
-rows = []
-empty_row_idx = 0
-dialect = csv.excel()
 model = Model(M=3)
-is_in_training=false
+is_in_training=False
 current_mse=0.0
 
+
+def require_api_key(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        print("=== AUTH CHECK ===", file=sys.stderr, flush=True)
+        api_key = request.headers.get('Authorization')
+        print(f"Received API key: {api_key}", file=sys.stderr, flush=True)
+        print(f"Expected API key: {API_KEY}", file=sys.stderr, flush=True)
+
+        if api_key and api_key == API_KEY:
+            print("AUTH SUCCESS", file=sys.stderr, flush=True)
+            return f(*args, **kwargs)
+        else:
+            print("AUTH FAILED", file=sys.stderr, flush=True)
+            return jsonify({'error': 'Invalid or missing API key'}), 401
+
+    return decorated_function
+
+
+@app.route('/predict', methods=['POST'])
+@require_api_key
+def predict():
+    global model
+
+    try:
+        data = request.get_json()
+
+        duty = float(data.get('dutyCycle', '0'))
+        temperature = float(data.get('temperature', '0'))
+        frequency = float(data.get('frequency', '0'))
+        initial_conc = float(data.get('initialConcentration', '0'))
+        time = float(data.get('timeLasted', '0'))
+
+        env_data = []
+        env_data.append(normalize(duty,0,1))
+        env_data.append(normalize(temperature,18,28))
+        env_data.append(normalize(frequency,0,40))
+
+        pred_result = model.predict(env_data, time, initial_conc)
+        
+        if not pred_result['success']:
+            return jsonify({
+                'status': 'error',
+                'message': pred_result['message']
+            }), 400
+
+        # Converti numpy arrays in liste
+        result = pred_result['result']
+        result['gompertz']['quantiles'] = result['gompertz']['quantiles'].tolist()
+        
+        return jsonify({
+            'status': 'success',
+            'received': data,
+            'result': result
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@app.route('/train', methods=['POST'])
+@require_api_key
+def train():
+    global model, is_in_training, current_mse
+
+    def train_model_background():
+        global model, is_in_training, current_mse
+        try:
+            all_data = load_dataset('/app/dataset_conf/dataset.csv')
+
+            divide_train_test_result = divide_train_test(all_data)
+            new_observed_data = divide_train_test_result['observed']
+            new_test_data = divide_train_test_result['test']
+
+            model.update_trainset(new_observed_data)
+            fit_result = model.fit()
+            
+            if not fit_result['success']:
+                logger.info(f"Training failed: {fit_result['message']}")
+                is_in_training = False
+                return
+
+            logger.info(f"Old Mean Square Error (MSE): {current_mse:.4f}")
+            mse = test_train(new_test_data, model)  
+            current_mse=mse
+            logger.info(f"New Mean Square Error (MSE): {current_mse:.4f}")
+
+            save_result = model.save_model('/app/dataset_conf/model.pkl')
+            if save_result['success']:
+                logger.info(save_result['message'])
+            else:
+                logger.info(f"Save failed: {save_result['message']}")
+                
+            is_in_training = False
+
+        except Exception as e:
+            logger.info(f"Training error: {e}")
+            is_in_training = False
+
+
+    try:
+        data = request.get_json()
+        if(is_in_training):
+            return jsonify({
+                'status': 'error',
+                'received': data,
+                'result': 'Training already in progress'
+            }), 409
+
+        append_csv_to_csv('/app/dataset_conf/dataset_new_rows.csv', '/app/dataset_conf/dataset.csv')
+        is_in_training = True
+        thread = threading.Thread(target=train_model_background, daemon=True)
+        thread.start()
+
+        return jsonify({
+            'status': 'success',
+            'received': data,
+            'result': 'Training started in background'
+        }), 202
+        
+    except Exception as e:
+        is_in_training = False
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@app.route('/addData', methods=['POST'])
+@require_api_key
+def addData():
+    try:
+        data = request.get_json()
+
+        data_row = [
+            str(data.get('dutyCycle', '0')),
+            str(data.get('temperature', '0')),
+            str(data.get('frequency', '0')),
+            str(data.get('initialConcentration', '0')),
+            str(data.get('timeLasted', '0')),
+            str(data.get('observedConcentration', '0'))
+        ]
+        append_row('/app/dataset_conf/dataset_new_rows.csv', data_row)
+
+        return jsonify({
+            'status': 'success',
+            'received': data_row,
+            'result': True
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+
+
 if __name__ == '__main__':
-
-
+    print("Starting Bayesian Neural Network model...")
+    
+    
     all_data = []
     observed_data = []
     test_data = []
 
-
-    if(os.path.exists('../../dataset_conf/dataset.csv')):
+    if(os.path.exists('/app/dataset_conf/dataset.csv')):
         print("A dataset is present, loading it...")
-        # Load dataset
-        all_data = load_dataset('../../dataset_conf/dataset.csv')
-
-        # Split dataset into training and test sets
+        
+        all_data = load_dataset('/app/dataset_conf/dataset.csv')
 
         divide_train_test_result = divide_train_test(all_data)
         observed_data = divide_train_test_result['observed']
         test_data = divide_train_test_result['test']
   
-
-    if(model.load_model('model.pkl')==0):
+    load_result = model.load_model('/app/dataset_conf/model.pkl')
+    if load_result['success']:
         print("Model loaded successfully")
+        
         mse = test_train(test_data, model)
         current_mse=mse  
         print(f"Mean Square Error (MSE): {mse:.4f}")
-
+        
 
     elif(len(all_data)>0):
         print("Training a new model")
+        
 
-        # set mcmc training params
         mcmc_params = {
             'num_samples': 4000,
             'burn_in': 1000,
@@ -856,134 +1073,26 @@ if __name__ == '__main__':
 
         model = Model(observed_data=observed_data, M=3, mcmc_params=mcmc_params)
         
-        # Fit the model
-        results = model.fit()
+        fit_result = model.fit()
+        if not fit_result['success']:
+            print(f"Training failed: {fit_result['message']}")
+            sys.exit(1)
 
-        # Test the model
         mse = test_train(test_data, model)  
         current_mse=mse
         print(f"Mean Square Error (MSE): {mse:.4f}")
+        
 
-        # Save the model
-        model.save_model('model.pkl')
+        save_result = model.save_model('/app/dataset_conf/model.pkl')
+        if not save_result['success']:
+            print(f"Failed to save model: {save_result['message']}")
 
     else:
-        print("Neither a model and a dataset were found, please provide a valid dataset in '../../dataset_conf/dataset.csv' or a trained model in './model.pkl'")
-        return -1
-
-    # Avvia il server
-    app.run(host='0.0.0.0', port=5000, debug=False)
-
-
-def require_api_key(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        api_key = request.headers.get('X-API-Key')
+        print("Neither a model and a dataset were found, please provide a valid dataset in '/app/dataset_conf/dataset.csv' or a trained model in '/app/dataset_conf/model.pkl'")
         
-        if api_key and api_key == API_KEY:
-            return f(*args, **kwargs)
-        else:
-            return jsonify({'error': 'Invalid or missing API key'}), 401
+        sys.exit(1)
+
+    print("Starting Flask server...")
     
-    return decorated_function
-
-
-
-@app.route('/predict', methods=['POST'])
-@require_api_key
-def predict():
-    data = request.get_json()
-
-    duty = float(data.get('dutyCycle', '0'))
-    temperature = float(data.get('temperature', '0'))
-    frequency = float(data.get('frequency', '0'))
-    initial_conc = float(data.get('initialConcentration', '0'))
-    time = float(data.get('timeLasted', '0'))
-
-    env_data = []
-    env_data.append(normalize(duty,0,1))
-    env_data.append(normalize(temperature,18,28))
-    env_data.append(normalize(frequency,0,40))
-
     
-    prediction = model.predict(env_data, time, initial_conc)
-
-
-    return jsonify({
-        'status': 'success',
-        'received': data,
-        'result': prediction
-    }), 200
-
-
-
-@app.route('/train', methods=['POST'])
-@require_api_key
-def train():
-
-    def train_model_background():
-        try:
-            all_data = load_dataset('../../dataset_conf/dataset.csv')
-
-            # Split dataset into training and test sets
-
-            divide_train_test_result = divide_train_test(all_data)
-            new_observed_data = divide_train_test_result['observed']
-            new_test_data = divide_train_test_result['test']
-
-
-            model.update_trainset(new_observed_data)
-            model.fit()
-
-            print(f"Old Mean Square Error (MSE): {current_mse:.4f}")
-            mse = test_train(new_test_data, model)  
-            current_mse=mse
-            print(f"New Mean Square Error (MSE): {current_mse:.4f}")
-
-            # Save the model
-            model.save_model('model.pkl')
-            is_in_training = false
-
-        except Exception as e:
-            print(f"Training error: {e}")
-
-    if(is_in_training):
-        return jsonify({
-            'status': 'error',
-            'received': data,
-            'result': 'Training already in progress'
-        }), 409
-
-    append_csv_to_csv('../../dataset_conf/dataset_new_rows.csv', '../../dataset_conf/dataset.csv')
-    is_in_training = true
-    thread = threading.Thread(target=train_model_background, daemon=True)
-    thread.start()
-
-    return jsonify({
-        'status': 'success',
-        'received': data,
-        'result': 'Training started in background'
-    }), 202
-
-
-@app.route('/addData', methods=['POST'])
-@require_api_key
-def addData():
-    data = request.get_json()
-
-    data_row = [
-        str(data.get('dutyCycle', '0')),
-        str(data.get('temperature', '0')),
-        str(data.get('frequency', '0')),
-        str(data.get('initialConcentration', '0')),
-        str(data.get('timeLasted', '0')),
-        str(data.get('observedConcentration', '0'))
-    ]
-    append_row('../../dataset_conf/dataset_new_rows.csv', data_row)
-
-
-    return jsonify({
-        'status': 'success',
-        'received': data_row,
-        'result': True
-    }), 200
+    app.run(host='0.0.0.0', port=5001, debug=True, use_reloader=False, threaded=True)

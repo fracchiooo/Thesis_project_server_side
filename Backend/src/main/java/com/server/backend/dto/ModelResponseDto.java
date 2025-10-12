@@ -1,6 +1,5 @@
 package com.server.backend.dto;
 
-import jakarta.annotation.Nonnull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -8,9 +7,12 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class completePredictionDto {
+public class ModelResponseDto {
 
-    @Nonnull
-    Float observed_density;
+    String status;
+
+    Object received;
+
+    Object result;
     
 }

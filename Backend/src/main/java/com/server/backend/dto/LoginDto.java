@@ -1,5 +1,6 @@
 package com.server.backend.dto;
 
+import jakarta.annotation.Nonnull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -7,12 +8,12 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class modelResponseDto {
+public class LoginDto {
 
-    String status;
+    @Nonnull
+    private String username;
 
-    Object received;
-
-    Object result;
+    @Nonnull
+    private String password;
     
 }

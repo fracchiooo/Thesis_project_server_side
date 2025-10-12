@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class statusDto {
+public class StatusDto {
 
     private String deviceEUI;
 
@@ -20,6 +20,6 @@ public class statusDto {
 
     private String username;
 
-    private Map<String, String> deviceEnvRequests;
+    private Map<String, Object> deviceEnvRequests;
 
 }

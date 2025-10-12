@@ -1,7 +1,6 @@
 package com.server.backend.model;
 
 import java.util.Date;
-import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
@@ -22,7 +21,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Data
 @Entity
-@Table(name = "prediction")
+@Table(name = "predictions")
 public class Prediction {
 
     @Id
@@ -58,7 +57,7 @@ public class Prediction {
 
     @JsonIgnore
     @ManyToOne
-    @JoinColumn(name = "user", nullable = true)
+    @JoinColumn(name = "user_id", referencedColumnName = "username")
     private User user;
 
 

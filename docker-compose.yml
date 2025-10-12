@@ -8,7 +8,12 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - MODEL_API_KEY=${MODEL_API_KEY:"default_api_key"}
+      - MODEL_API_KEY=${MODEL_API_KEY:-default_api_key}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      model:
+        condition: service_started
     networks:
       - app-network
 
@@ -16,19 +21,48 @@ services:
     build:
       context: ./Model
       dockerfile: Dockerfile
-    container_name: moodel_service
+    container_name: model_service
     ports:
-      - "5000:5000"
+      - "5001:5001"
     environment:
-      - MODEL_API_KEY=${MODEL_API_KEY:"default_api_key"}
+      - MODEL_API_KEY=${MODEL_API_KEY:-default_api_key}
     restart: unless-stopped
     networks:
       - app-network
     volumes:
-      - ./data:/app/data
+      - ./Model/data:/app/data
+      - type: bind
+        source: ../dataset_conf
+        target: /app/dataset_conf
+
+
+  postgresql:
+    container_name: postgres
+    image: postgres:17
+    restart: always
+    environment:
+      POSTGRES_USER: chirpstack
+      POSTGRES_PASSWORD: chirpstack
+      POSTGRES_DB: backend_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chirpstack -d postgres"]
+      interval: 30s
+      retries: 3
+      start_period: 10s
+      timeout: 5s
 
 
 
 networks:
   app-network:
     driver: bridge
+
+
+volumes:
+  postgres_data:

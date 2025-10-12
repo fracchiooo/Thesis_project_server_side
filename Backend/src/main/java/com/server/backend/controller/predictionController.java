@@ -12,10 +12,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.server.backend.dto.completePredictionDto;
-import com.server.backend.dto.dataForDatasetDto;
-import com.server.backend.dto.predictResponseDto;
-import com.server.backend.dto.predictionDto;
+import com.server.backend.dto.CompletePredictionDto;
+import com.server.backend.dto.DataForDatasetDto;
+import com.server.backend.dto.PredictResponseDto;
+import com.server.backend.dto.PredictionDto;
 import com.server.backend.model.Prediction;
 import com.server.backend.service.predictionService;
 
@@ -31,13 +31,13 @@ public class predictionController {
     private predictionService predictionServ;
 
     @PostMapping("/predict")
-    public ResponseEntity<predictResponseDto> predict(@RequestBody predictionDto predDto) {
+    public ResponseEntity<PredictResponseDto> predict(@RequestBody PredictionDto predDto) {
         return predictionServ.predict(predDto);
         
     }
 
     @PutMapping("predict/{id}")
-    public ResponseEntity<Object> completePrediction(@PathVariable Long id, @RequestBody completePredictionDto observed) {
+    public ResponseEntity<Object> completePrediction(@PathVariable Long id, @RequestBody CompletePredictionDto observed) {
         return predictionServ.completePrediction(id, observed);
     }
 
@@ -55,7 +55,7 @@ public class predictionController {
     }
 
     @PostMapping("/addData")
-    public ResponseEntity<Object> addData(@RequestBody dataForDatasetDto dataDto) {
+    public ResponseEntity<Object> addData(@RequestBody DataForDatasetDto dataDto) {
         return predictionServ.addData(dataDto);
     }
     

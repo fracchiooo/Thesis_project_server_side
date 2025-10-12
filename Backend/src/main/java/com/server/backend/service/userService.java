@@ -1,7 +1,6 @@
 package com.server.backend.service;
 
-import java.time.Instant;
-import java.util.Base64;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.Optional;
 
@@ -16,9 +15,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.server.backend.dto.loginDto;
-import com.server.backend.dto.userProfileRequestDto;
-import com.server.backend.dto.userProfileResponseDto;
+import com.server.backend.dto.LoginDto;
+import com.server.backend.dto.UserProfileRequestDto;
+import com.server.backend.dto.UserProfileResponseDto;
 import com.server.backend.model.User;
 import com.server.backend.repository.userRepository;
 
@@ -30,6 +29,7 @@ public class userService {
 
     @Value("${authentication.service.jwtSecret}")
     private String secretKey;
+
     @Value("${authentication.service.jwtExpirationTime}")
     private long expirationTime;
 
@@ -50,7 +50,7 @@ public class userService {
     }
 
     
-    public userProfileResponseDto createUserProfile(userProfileRequestDto dto) throws Exception{
+    public UserProfileResponseDto createUserProfile(UserProfileRequestDto dto) throws Exception{
         User u = new User();
         u.setUsername(dto.getUsername());
         u.setHashPassword(hashPassword(dto.getPassword()));
@@ -60,10 +60,10 @@ public class userService {
         }
         u = userRepo.save(u);
         userRepo.flush();
-        return objectMapper.convertValue(u, userProfileResponseDto.class);
+        return objectMapper.convertValue(u, UserProfileResponseDto.class);
     }
 
-    public ResponseEntity<Object> login(loginDto dto){
+    public ResponseEntity<Object> login(LoginDto dto){
         Optional<User> up = userRepo.findOneByUsername(dto.getUsername());
 
         if (up.isEmpty()) return new ResponseEntity<>("username not present", HttpStatus.NOT_FOUND);
@@ -89,15 +89,18 @@ public class userService {
 
     private SecretKey generateKey() {
         System.out.println(secretKey);
-        byte[] decodeKey = Base64.getDecoder().decode(secretKey);
-        return Keys.hmacShaKeyFor(decodeKey);
+        return Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
     }
 
     public boolean validateToken(String token) {
         try {
-            boolean ret = Jwts.parserBuilder().setSigningKey(generateKey()).build().parseClaimsJws(token).getBody().getExpiration().after(Date.from(Instant.now()));
-            return ret;
+            Jwts.parserBuilder()
+                .setSigningKey(generateKey())
+                .build()
+                .parseClaimsJws(token);
+            return true;
         } catch (Exception e) {
+            System.out.println("Exception during the validation of the token: "+e.getMessage());
             return false;
         }
     }

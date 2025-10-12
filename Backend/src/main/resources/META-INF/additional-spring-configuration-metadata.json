@@ -20,16 +20,6 @@
     "description": "A description for 'spring.application_id'"
   },
   {
-    "name": "authentication.service.jwtSecret",
-    "type": "java.lang.String",
-    "description": "A description for 'authentication.service.jwtSecret'"
-  },
-  {
-    "name": "authentication.service.jwtExpirationTime",
-    "type": "java.lang.String",
-    "description": "A description for 'authentication.service.jwtExpirationTime'"
-  },
-  {
     "name": "spring.model.host",
     "type": "java.lang.String",
     "description": "A description for 'spring.model.host'"
@@ -43,5 +33,30 @@
     "name": "spring.model.api_key",
     "type": "java.lang.String",
     "description": "A description for 'spring.model.api_key'"
+  },
+  {
+    "name": "spring.mqtt.tls.ca-cert",
+    "type": "java.lang.String",
+    "description": "A description for 'spring.mqtt.tls.ca-cert'"
+  },
+  {
+    "name": "spring.mqtt.username",
+    "type": "java.lang.String",
+    "description": "A description for 'spring.mqtt.username'"
+  },
+  {
+    "name": "spring.mqtt.password",
+    "type": "java.lang.String",
+    "description": "A description for 'spring.mqtt.password'"
+  },
+  {
+    "name": "authentication.service.jwtSecret",
+    "type": "java.lang.String",
+    "description": "A description for 'authentication.service.jwtSecret'"
+  },
+  {
+    "name": "authentication.service.jwtExpirationTime",
+    "type": "java.lang.String",
+    "description": "A description for 'authentication.service.jwtExpirationTime'"
   }
 ]}

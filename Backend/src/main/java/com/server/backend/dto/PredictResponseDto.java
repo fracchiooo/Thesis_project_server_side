@@ -1,6 +1,7 @@
 package com.server.backend.dto;
 
-import jakarta.annotation.Nonnull;
+import java.util.Date;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -8,21 +9,24 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class predictionDto {
+public class PredictResponseDto {
 
-    @Nonnull
+    private Long id;
+
+    private Date timestamp;
+
+    private Float predictedConcentration;
+
+    private Float predictedUncertainty;
+
     private Float initialConcentration;
 
-    @Nonnull
     private Float frequency;
     
-    @Nonnull
     private Float dutyCycle;
 
-    @Nonnull
     private Float timeLasted;
 
-    @Nonnull
     private Float temperature;
     
 }
