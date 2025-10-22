@@ -6,8 +6,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.TimeZone;
 
-import org.hibernate.annotations.DynamicUpdate;
-
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -44,6 +42,9 @@ public class Device {
     @Column(name = "currentTemperature")
     private Float currentTemperature;
 
+    @Column(name = "currentSensedfrequency")
+    private Float currentSensedFrequency;
+
 
     @Column(name = "device_env_requests", columnDefinition = "TEXT")
     private String deviceEnvRequestsJson;
@@ -65,9 +66,9 @@ public class Device {
         this.user = user;
         this.lastUpdate = new Date();
         this.currentTemperature = null;
+        this.currentSensedFrequency = null;
         this.deviceEnvRequests.put("frequency", null);
         this.deviceEnvRequests.put("duty_frequency", null);
-        this.deviceEnvRequests.put("temperature", null);
         this.deviceEnvRequests.put("start time", null);
         this.deviceEnvRequests.put("finish after", null);
     }
@@ -88,7 +89,7 @@ public class Device {
             deviceEnvRequests = new HashMap<>();
         }
         switch (key) {
-            case "temperature", "frequency", "duty_frequency", "finish after" -> {
+            case "frequency", "duty_frequency", "finish after" -> {
                 if (value instanceof Number number) {
                     deviceEnvRequests.put(key, number.floatValue());
                 } else {

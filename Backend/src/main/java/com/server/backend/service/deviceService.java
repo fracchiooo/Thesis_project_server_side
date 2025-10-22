@@ -169,12 +169,11 @@ public class deviceService {
             MessageUplinkDto message = objectMapper.readValue(payload, MessageUplinkDto.class);
             device.setLastUpdate(message.getLastUpdate());
             device.setCurrentTemperature(message.getCurrentTemperature());
-
+            device.setCurrentSensedFrequency(message.getCurrentSensedFrequency());
             device.setDeviceEnvRequests("duty_frequency", message.getDeviceEnvRequests().getDuty_frequency());
             device.setDeviceEnvRequests("frequency", message.getDeviceEnvRequests().getFrequency());
             device.setDeviceEnvRequests("finish after", message.getDeviceEnvRequests().getFinishAfter());
             device.setDeviceEnvRequests("start time", message.getDeviceEnvRequests().getStartTime());
-            device.setDeviceEnvRequests("temperature", message.getDeviceEnvRequests().getTemperature());
             
             deviceRepo.save(device);
             deviceRepo.flush();

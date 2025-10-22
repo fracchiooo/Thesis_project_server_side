@@ -19,9 +19,6 @@ public class CommandDto {
     private Float duty_frequency;
 
     @Nonnull
-    private Float temperature;
-
-    @Nonnull
     private Float finish_after;
     
     private Date startTime;    

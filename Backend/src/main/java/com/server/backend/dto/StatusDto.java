@@ -18,6 +18,8 @@ public class StatusDto {
 
     private Float currentTemperature;
 
+    private Float currentSensedFrequency;
+
     private String username;
 
     private Map<String, Object> deviceEnvRequests;

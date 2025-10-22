@@ -4,6 +4,7 @@ import java.util.Date;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 
+import io.micrometer.common.lang.NonNull;
 import jakarta.annotation.Nonnull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -19,6 +20,9 @@ public class MessageUplinkDto {
 
     @Nonnull
     private Float currentTemperature;
+
+    @Nonnull
+    private Float currentSensedFrequency;
 
     @Nonnull
     private DeviceEnvMessageDto  deviceEnvRequests;
