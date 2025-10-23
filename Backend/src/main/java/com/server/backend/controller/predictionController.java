@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.server.backend.dto.CompletePredictionDto;
 import com.server.backend.dto.DataForDatasetDto;
-import com.server.backend.dto.PredictResponseDto;
 import com.server.backend.dto.PredictionDto;
 import com.server.backend.model.Prediction;
 import com.server.backend.service.predictionService;
@@ -31,7 +30,7 @@ public class predictionController {
     private predictionService predictionServ;
 
     @PostMapping("/predict")
-    public ResponseEntity<PredictResponseDto> predict(@RequestBody PredictionDto predDto) {
+    public ResponseEntity<Prediction> predict(@RequestBody PredictionDto predDto) {
         return predictionServ.predict(predDto);
         
     }

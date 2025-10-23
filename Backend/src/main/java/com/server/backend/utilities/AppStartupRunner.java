@@ -1,12 +1,15 @@
 package com.server.backend.utilities;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
+import com.server.backend.model.Device;
 import com.server.backend.mqtt.MqttSubscriber;
 import com.server.backend.service.deviceService;
 
@@ -27,7 +30,13 @@ public class AppStartupRunner implements CommandLineRunner {
         
         log.info("✓ Applicazione avviata - Eseguo sottoscrizioni MQTT per i dispositivi esistenti...");
 
-        List<String> allDeviceEUIs = deviceService.getAllDevices().getBody();
+
+        List<String> allDeviceEUIs = Optional.ofNullable(deviceService.getAllDevices().getBody())
+            .orElse(Collections.emptyList())
+            .stream()
+            .map(Device::getDeviceEUI)
+            .toList();
+                
         if (allDeviceEUIs == null || allDeviceEUIs.isEmpty()) {
             log.info("Nessun dispositivo trovato per la sottoscrizione.");
             return;

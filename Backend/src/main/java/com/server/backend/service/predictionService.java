@@ -3,6 +3,7 @@ package com.server.backend.service;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,7 +17,6 @@ import org.springframework.web.client.RestTemplate;
 import com.server.backend.dto.CompletePredictionDto;
 import com.server.backend.dto.DataForDatasetDto;
 import com.server.backend.dto.ModelResponseDto;
-import com.server.backend.dto.PredictResponseDto;
 import com.server.backend.dto.PredictionDto;
 import com.server.backend.model.Prediction;
 import com.server.backend.repository.predictionRepository;
@@ -45,7 +45,7 @@ public class predictionService {
     private String apiKey;
 
 
-    public ResponseEntity<PredictResponseDto> predict(PredictionDto predDto) {
+    public ResponseEntity<Prediction> predict(PredictionDto predDto) {
         // TODO make call to the model microservice
         // TODO save the prediction in the database (without observed data)
         
@@ -74,14 +74,14 @@ public class predictionService {
                 p.setInitialConcentration(predDto.getInitialConcentration());
                 p.setTimeLasted(predDto.getTimeLasted());
                 p.setEnvironmentalConditions(predDto.getFrequency(), predDto.getDutyCycle(), predDto.getTemperature());
-
+                p.setSentToDataset(false);
                 String username = JWTContext.get();
                 p.setUser(userRepo.findOneByUsername(username).orElse(null));
                 
                 p = predictionRepo.save(p);
                 predictionRepo.flush();
 
-                PredictResponseDto responseDto = new PredictResponseDto();
+                /*PredictResponseDto responseDto = new PredictResponseDto();
                 responseDto.setId(p.getId());
                 responseDto.setTimestamp(p.getTimestamp());
                 responseDto.setPredictedConcentration(p.getPredictedConcentration());
@@ -90,9 +90,9 @@ public class predictionService {
                 responseDto.setFrequency(p.getFrequency());
                 responseDto.setDutyCycle(p.getDutyCycle());
                 responseDto.setTimeLasted(p.getTimeLasted());
-                responseDto.setTemperature(p.getTemperature());
+                responseDto.setTemperature(p.getTemperature());*/
 
-                return ResponseEntity.ok(responseDto);
+                return ResponseEntity.ok(p);
             } else {
                 return ResponseEntity.status(500).body(null);
             }
@@ -109,9 +109,9 @@ public class predictionService {
             return ResponseEntity.status(404).body("Prediction not found");
         }
         p.setObservedConcentration(observed.getObserved_density());
-        predictionRepo.save(p);
+        p = predictionRepo.save(p);
         predictionRepo.flush();
-        return ResponseEntity.ok("Prediction updated");
+        return ResponseEntity.ok(p);
     }
 
 
@@ -119,11 +119,6 @@ public class predictionService {
     public ResponseEntity<List<Prediction>> listPredictions() {
 
         List<Prediction> predictions = predictionRepo.findAll();
-
-        if(predictions.isEmpty()) {
-            return ResponseEntity.status(404).body(null);
-        }
-
         return ResponseEntity.ok(predictions);
     }
 
@@ -156,6 +151,11 @@ public class predictionService {
 
 
     public ResponseEntity<Object> addData(DataForDatasetDto dataDto) {
+        Optional<Prediction> p = predictionRepo.findById(dataDto.getId());
+        if(p.isEmpty()){
+            return ResponseEntity.status(404).body("prediction not found");
+        }
+        Prediction pred = p.get();
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("Content-Type", "application/json");
@@ -169,6 +169,9 @@ public class predictionService {
         ResponseEntity<ModelResponseDto> res = restTemplate.exchange(predictUrl, HttpMethod.POST, requestEntity, ModelResponseDto.class);
         
         if (res.getStatusCode().is2xxSuccessful() && res.getBody() != null) {
+            pred.setSentToDataset(true);
+            predictionRepo.save(pred);
+            predictionRepo.flush();
             ModelResponseDto responseBody = res.getBody();
             if (responseBody!=null && responseBody.getStatus().equals("success")) {
                 return ResponseEntity.ok(responseBody.getResult());

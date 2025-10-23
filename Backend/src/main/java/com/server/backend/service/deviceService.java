@@ -150,11 +150,8 @@ public class deviceService {
     }
 
 
-    public ResponseEntity<List<String>> getAllDevices() {
-        List<String> devices = deviceRepo.findAll().stream().map(d -> d.getDeviceEUI()).toList();
-        if(devices.isEmpty()){
-            return ResponseEntity.noContent().build();
-        }
+    public ResponseEntity<List<Device>> getAllDevices() {
+        List<Device> devices = deviceRepo.findAll();
         return ResponseEntity.ok(devices);
     }
 

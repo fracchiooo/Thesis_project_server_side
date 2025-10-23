@@ -55,6 +55,9 @@ public class Prediction {
     @Column(name = "temperature")
     private Float temperature;
 
+    @Column(name = "sentToDataset")
+    private boolean sentToDataset;
+
     @JsonIgnore
     @ManyToOne
     @JoinColumn(name = "user_id", referencedColumnName = "username")

@@ -11,6 +11,9 @@ import lombok.NoArgsConstructor;
 public class DataForDatasetDto {
 
     @Nonnull
+    private Long id;
+
+    @Nonnull
     private Float initialConcentration;
 
     @Nonnull

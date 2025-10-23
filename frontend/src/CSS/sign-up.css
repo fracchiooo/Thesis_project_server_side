@@ -1,0 +1,84 @@
+.subscription-container {
+    margin: 20px auto;
+    max-width: 600px;
+    padding: 20px;
+    background: #f9f9f9;
+    border-radius: 10px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  }
+  
+  .subscription-header {
+    text-align: center;
+    color: #333;
+    margin-bottom: 20px;
+  }
+  
+  .form-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .form-group {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .form-group label {
+    font-weight: bold;
+    margin-bottom: 5px;
+  }
+  
+  input, select {
+    padding: 10px;
+    font-size: 14px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+  }
+  
+  .create-button {
+    padding: 10px 20px;
+    font-size: 16px;
+    color: #fff;
+    background-color: #007bff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    align-self: center;
+  }
+  
+  .create-button:disabled {
+    background-color: #6c757d;
+  }
+  
+  .error-message {
+    text-align: center;
+    color: red;
+    margin-top: 20px;
+  }
+  
+  .success-message {
+    text-align: center;
+    color: green;
+    margin-top: 20px;
+  }
+  
+  .button-container {
+    margin-top: 20px;
+    text-align: center;
+  }
+  
+  .login-button {
+    padding: 10px 20px;
+    font-size: 16px;
+    color: #fff;
+    background-color: #28a745;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  
+  .login-button:hover {
+    background-color: #218838;
+  }
+  

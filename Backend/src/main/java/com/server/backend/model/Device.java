@@ -51,9 +51,9 @@ public class Device {
     private Float currentSensedFrequency;
 
     @OneToMany(mappedBy = "device", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<DeviceStatusLogs> storico = new ArrayList<>();
+    private List<DeviceStatusLogs> logs = new ArrayList<>();
 
-
+    @JsonIgnore
     @Column(name = "device_env_requests", columnDefinition = "TEXT")
     private String deviceEnvRequestsJson;
 
@@ -62,7 +62,6 @@ public class Device {
 
     @Transient
     private static final ObjectMapper objectMapper = new ObjectMapper();
-
 
     @JsonIgnore
     @ManyToOne

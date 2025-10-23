@@ -1,0 +1,283 @@
+.device-page-wrapper {
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.device-card {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+.device-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.device-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.device-eui {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #333;
+    font-family: 'Courier New', monospace;
+}
+
+.delete-button {
+    background-color: #f44336;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.delete-button:hover {
+    background-color: #da190b;
+    transform: scale(1.05);
+}
+
+.device-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.device-info-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border-radius: 6px;
+    transition: background-color 0.2s;
+}
+
+.device-info-item:hover {
+    background-color: #f0f0f0;
+}
+
+.device-info-item .info-icon {
+    color: #88c265;
+    font-size: 1.2em;
+    min-width: 24px;
+}
+
+.device-info-item .info-label {
+    flex: 1;
+    font-weight: 600;
+    color: #666;
+}
+
+.device-info-item .info-value {
+    font-weight: 700;
+    color: #333;
+}
+
+/* Page Layout */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.page-header h1 {
+    margin: 0;
+    color: #333;
+    font-size: 2em;
+}
+
+.device-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+}
+
+/* Create Button */
+.create-button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    background-color: #88c265;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.create-button:hover {
+    background-color: #76a856;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(136, 194, 101, 0.3);
+}
+
+/* Loading & Error States */
+.loading,
+.error {
+    text-align: center;
+    padding: 40px;
+    font-size: 1.2em;
+    color: #666;
+}
+
+.error {
+    color: #f44336;
+}
+
+/* No Devices Message */
+.no-devices {
+    text-align: center;
+    padding: 60px 20px;
+    color: #999;
+    grid-column: 1 / -1;
+}
+
+.no-devices p:first-child {
+    font-size: 1.5em;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.no-devices p:last-child {
+    font-size: 1em;
+    color: #666;
+}
+
+/* Modal Styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.modal-content h2 {
+    margin: 0 0 20px 0;
+    color: #333;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #555;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 1em;
+    transition: border-color 0.2s;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #88c265;
+}
+
+.button-group {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.primary-button,
+.secondary-button {
+    flex: 1;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.primary-button {
+    background-color: #88c265;
+    color: white;
+}
+
+.primary-button:hover {
+    background-color: #76a856;
+}
+
+.secondary-button {
+    background-color: #e0e0e0;
+    color: #333;
+}
+
+.secondary-button:hover {
+    background-color: #d0d0d0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .device-page-wrapper {
+        padding: 16px;
+    }
+
+    .page-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .page-header h1 {
+        font-size: 1.5em;
+    }
+
+    .device-container {
+        grid-template-columns: 1fr;
+    }
+
+    .device-card {
+        padding: 16px;
+    }
+
+    .device-eui {
+        font-size: 1em;
+    }
+}
