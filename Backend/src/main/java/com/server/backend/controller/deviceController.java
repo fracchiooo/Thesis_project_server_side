@@ -1,8 +1,10 @@
 package com.server.backend.controller;
 
+import java.util.Date;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,11 +12,15 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.server.backend.dto.CommandDto;
 import com.server.backend.dto.StatusDto;
+import com.server.backend.model.DeviceStatusLogs;
 import com.server.backend.service.deviceService;
+
+
 
 
 @RestController
@@ -59,6 +65,20 @@ public class deviceController {
     public ResponseEntity<Object> sendCommand(@RequestBody CommandDto commandDto, @PathVariable String devEUI) {        
         return deviceServ.sendCommand(commandDto, devEUI);
     }
+
+    @GetMapping("/getDeviceLogs/{devEUI}")
+    public ResponseEntity<List<DeviceStatusLogs>> getDeviceLogs(@PathVariable String devEUI) {
+        return deviceServ.getStatussesDevice(devEUI);
+    }
+
+    @GetMapping("/getDeviceLogsPages/{devEUI}")
+    public Page<DeviceStatusLogs> DeviceStatusLogsPages(@PathVariable String deviceEUI, @RequestParam Date start_date, @RequestParam Date finish_date, 
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "50") int size) {
+        return deviceServ.getLogsByCustomDateRange(deviceEUI, start_date, finish_date, page, size);
+    }
+    
+    
     
     
 }

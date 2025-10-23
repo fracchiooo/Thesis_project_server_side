@@ -1,11 +1,16 @@
 package com.server.backend.service;
 
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,17 +21,17 @@ import com.server.backend.dto.CommandDto;
 import com.server.backend.dto.MessageUplinkDto;
 import com.server.backend.dto.StatusDto;
 import com.server.backend.model.Device;
+import com.server.backend.model.DeviceStatusLogs;
 import com.server.backend.model.User;
 import com.server.backend.mqtt.MqttMessageEvent;
 import com.server.backend.mqtt.MqttPublisher;
 import com.server.backend.mqtt.MqttSubscriber;
 import com.server.backend.repository.deviceRepository;
+import com.server.backend.repository.deviceStatusLogsRepository;
 import com.server.backend.repository.userRepository;
 import com.server.backend.utilities.JWTContext;
 
 import jakarta.persistence.EntityManager;
-
-//TODO add script to subscribe all the current active devices to their relative queues
 
 
 @Service
@@ -41,6 +46,9 @@ public class deviceService {
 
     @Autowired
     private userRepository userRepo;
+
+    @Autowired
+    private deviceStatusLogsRepository devLogsRepo;
 
     @Autowired
     private MqttSubscriber mqttSubscriber;
@@ -177,6 +185,18 @@ public class deviceService {
             
             deviceRepo.save(device);
             deviceRepo.flush();
+
+            //saves the last 777700 entries for each device, then each new update log replaces the oldest one
+            // if we have an update every 10 seconds, I'm able to display the last 90 days of updates
+            DeviceStatusLogs devLog = new DeviceStatusLogs();
+            devLog.setDevice(device);
+            devLog.setStatusDate(message.getLastUpdate());
+            devLog.setTemperature(message.getCurrentTemperature());
+            devLog.setFrequency(message.getCurrentSensedFrequency());
+
+            devLogsRepo.save(devLog);
+            devLogsRepo.flush();
+
             entityManager.flush();
 
             System.out.println("Updated device status for: " + topic);
@@ -186,5 +206,34 @@ public class deviceService {
             System.out.println("Payload was: "+ payload);
             System.out.println("Error parsing JSON payload for device: " + topic);
         }
+    }
+
+
+    public ResponseEntity<List<DeviceStatusLogs>> getStatussesDevice(String deviceEUI){
+        if (!deviceRepo.existsById(deviceEUI)) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(devLogsRepo.findByDeviceDeviceEUI(deviceEUI));
+    }
+
+    public Page<DeviceStatusLogs> getLogsByCustomDateRange(
+            String deviceId,
+            Date startDate,
+            Date endDate,
+            int page,
+            int size) {
+        
+        Pageable pageable = PageRequest.of(
+            page, 
+            size, 
+            Sort.by(Sort.Direction.DESC, "statusDate")
+        );
+        
+        return devLogsRepo.findByDeviceDeviceEUIAndStatusDateBetween(
+            deviceId, 
+            startDate, 
+            endDate, 
+            pageable
+        );
     }
 }
