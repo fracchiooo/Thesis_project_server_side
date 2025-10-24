@@ -50,6 +50,7 @@ public class Device {
     @Column(name = "currentSensedfrequency")
     private Float currentSensedFrequency;
 
+    @JsonIgnore
     @OneToMany(mappedBy = "device", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<DeviceStatusLogs> logs = new ArrayList<>();
 

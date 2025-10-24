@@ -2,13 +2,15 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import PredictionCard from "./PredictionCard.tsx";
-import { FaPlus, FaDatabase } from "react-icons/fa";
+import { FaPlus, FaDatabase, FaBrain } from "react-icons/fa";
 import { Prediction } from "../../types/Prediction.ts";
+import '../../CSS/prediction.css';
 
 const PredictionPage = () => {
     const [predictions, setPredictions] = useState<Prediction[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [isTraining, setIsTraining] = useState(false);
     const token = localStorage.getItem('authToken');
     const navigate = useNavigate();
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -20,6 +22,7 @@ const PredictionPage = () => {
         timeLasted: '',
         temperature: ''
     });
+    const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
     const fetchPredictions = async () => {
         if (token == null) {
@@ -51,10 +54,62 @@ const PredictionPage = () => {
 
     const onCreate = () => {
         setIsModalOpen(true);
+        setValidationErrors([]);
+    };
+
+    const validatePrediction = (): boolean => {
+        const errors: string[] = [];
+
+        // Validazione campi obbligatori
+        if (!newPrediction.initialConcentration || !newPrediction.frequency || 
+            !newPrediction.dutyCycle || !newPrediction.timeLasted || !newPrediction.temperature) {
+            errors.push('All fields are required');
+            setValidationErrors(errors);
+            return false;
+        }
+
+        const frequency = parseFloat(newPrediction.frequency);
+        const dutyCycle = parseFloat(newPrediction.dutyCycle);
+        const temperature = parseFloat(newPrediction.temperature);
+        const initialConcentration = parseFloat(newPrediction.initialConcentration);
+        const timeLasted = parseFloat(newPrediction.timeLasted);
+
+        // Validazione range frequency (0-40 Hz)
+        if (isNaN(frequency) || frequency < 0 || frequency > 40) {
+            errors.push('Frequency must be between 0 and 40 Hz');
+        }
+
+        // Validazione range dutyCycle (0-1)
+        if (isNaN(dutyCycle) || dutyCycle < 0 || dutyCycle > 1) {
+            errors.push('Duty Cycle must be between 0 and 1');
+        }
+
+        // Validazione range temperature (18-28°C)
+        if (isNaN(temperature) || temperature < 18 || temperature > 28) {
+            errors.push('Temperature must be between 18 and 28°C');
+        }
+
+        // Validazione valori positivi
+        if (isNaN(initialConcentration) || initialConcentration <= 0) {
+            errors.push('Initial Concentration must be greater than 0');
+        }
+
+        if (isNaN(timeLasted) || timeLasted <= 0) {
+            errors.push('Time Lasted must be greater than 0');
+        }
+
+        setValidationErrors(errors);
+        return errors.length === 0;
     };
 
     const handleCreate = async () => {
         if (token == null) throw new Error("the token is null");
+
+        // Validazione
+        if (!validatePrediction()) {
+            return;
+        }
+
         const parsedData = JSON.parse(token);
         const tokenParsed = parsedData.token;
 
@@ -75,6 +130,15 @@ const PredictionPage = () => {
                 }
             });
             alert('Prediction created successfully!');
+            setIsModalOpen(false);
+            setNewPrediction({
+                initialConcentration: '',
+                frequency: '',
+                dutyCycle: '',
+                timeLasted: '',
+                temperature: ''
+            });
+            setValidationErrors([]);
         } catch (err: any) {
             setError(err.message);
             alert('Failed to create prediction: ' + err.message);
@@ -82,15 +146,6 @@ const PredictionPage = () => {
             setLoading(false);
             fetchPredictions();
         }
-
-        setIsModalOpen(false);
-        setNewPrediction({
-            initialConcentration: '',
-            frequency: '',
-            dutyCycle: '',
-            timeLasted: '',
-            temperature: ''
-        });
     };
 
     const handleCancel = () => {
@@ -102,6 +157,7 @@ const PredictionPage = () => {
             timeLasted: '',
             temperature: ''
         });
+        setValidationErrors([]);
     };
 
     const handleInputChange = (field: string, value: string) => {
@@ -149,14 +205,13 @@ const PredictionPage = () => {
             let successCount = 0;
             
             for (const prediction of selectedData) {
-                // Verifica che l'ID esista
                 if (!prediction.id) {
                     console.error('Prediction without ID:', prediction);
                     continue;
                 }
 
                 const dataDto = {
-                    id: prediction.id.valueOf(),  // ← AGGIUNGI L'ID
+                    id: prediction.id.valueOf(),
                     initialConcentration: prediction.initialConcentration?.valueOf() || 0,
                     frequency: prediction.frequency?.valueOf() || 0,
                     dutyCycle: prediction.dutyCycle?.valueOf() || 0,
@@ -182,7 +237,7 @@ const PredictionPage = () => {
 
             alert(`Successfully added ${successCount} prediction(s) to dataset!`);
             setSelectedPredictions(new Set());
-            await fetchPredictions(); // Ricarica per aggiornare sentToDataset
+            await fetchPredictions();
         } catch (err: any) {
             console.error('Error adding to dataset:', err);
             setError(err.message);
@@ -192,11 +247,41 @@ const PredictionPage = () => {
         }
     };
 
+    const handleTrain = async () => {
+        if (!window.confirm('Are you sure you want to train the model? This may take several minutes.')) {
+            return;
+        }
+
+        if (token == null) throw new Error("Token is null");
+        const parsedData = JSON.parse(token);
+        const tokenParsed = parsedData.token;
+
+        try {
+            setIsTraining(true);
+            const response = await axios.post(
+                "http://localhost:3000/prediction/train",
+                {},
+                {
+                    headers: {
+                        Authorization: `Bearer ${tokenParsed}`
+                    }
+                }
+            );
+            alert('Model training completed successfully!');
+            console.log('Training response:', response.data);
+        } catch (err: any) {
+            console.error('Error training model:', err);
+            alert('Failed to train model: ' + (err.response?.data || err.message));
+        } finally {
+            setIsTraining(false);
+        }
+    };
+
     if (loading) return <div className="loading">Loading...</div>;
     if (error) return <div className="error">Error: {error}</div>;
 
     return (
-        <div className="shopping-list-page-wrapper">
+        <div className="prediction-page-wrapper">
             <div className="page-header">
                 <button className="create-button" onClick={onCreate}>
                     <FaPlus /> Create New Prediction
@@ -213,7 +298,7 @@ const PredictionPage = () => {
                 )}
             </div>
 
-            <div className="shopping-lists-container">
+            <div className="predictions-container">
                 {predictions.length > 0 ? (
                     predictions.map((prediction, index) => (
                         <PredictionCard 
@@ -226,20 +311,56 @@ const PredictionPage = () => {
                         />
                     ))
                 ) : (
-                    <div className="no-shopping-lists">No predictions found.</div>
+                    <div className="no-predictions">No predictions found.</div>
                 )}
             </div>
 
+            {/* Train Model Button */}
+            <div className="train-section">
+                <button 
+                    className="train-button" 
+                    onClick={handleTrain}
+                    disabled={isTraining}
+                >
+                    {isTraining ? (
+                        <>
+                            <span className="spinner"></span> Training Model...
+                        </>
+                    ) : (
+                        <>
+                            <FaBrain /> Train Model
+                        </>
+                    )}
+                </button>
+                <p className="train-info">
+                    Train the prediction model with the current dataset to improve accuracy
+                </p>
+            </div>
+
             {isModalOpen && (
-                <div className="modal">
-                    <div className="modal-content">
+                <div className="modal-overlay" onClick={handleCancel}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                         <h2>Create New Prediction</h2>
                         
+                        {validationErrors.length > 0 && (
+                            <div className="validation-errors">
+                                {validationErrors.map((error, index) => (
+                                    <div key={index} className="validation-error">
+                                        ⚠️ {error}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        
                         <div className="form-group">
-                            <label>Initial Concentration:</label>
+                            <label>
+                                Initial Concentration:
+                                <span className="range-hint">(&gt; 0)</span>
+                            </label>
                             <input
                                 type="number"
                                 step="0.01"
+                                min="0.01"
                                 value={newPrediction.initialConcentration}
                                 onChange={(e) => handleInputChange('initialConcentration', e.target.value)}
                                 placeholder="Enter initial concentration"
@@ -247,52 +368,70 @@ const PredictionPage = () => {
                         </div>
 
                         <div className="form-group">
-                            <label>Frequency:</label>
+                            <label>
+                                Frequency (Hz):
+                                <span className="range-hint">(0 - 40)</span>
+                            </label>
                             <input
                                 type="number"
                                 step="0.01"
+                                min="0"
+                                max="40"
                                 value={newPrediction.frequency}
                                 onChange={(e) => handleInputChange('frequency', e.target.value)}
-                                placeholder="Enter frequency"
+                                placeholder="Enter frequency (0-40 Hz)"
                             />
                         </div>
 
                         <div className="form-group">
-                            <label>Duty Cycle:</label>
+                            <label>
+                                Duty Cycle:
+                                <span className="range-hint">(0 - 1)</span>
+                            </label>
                             <input
                                 type="number"
                                 step="0.01"
+                                min="0"
+                                max="1"
                                 value={newPrediction.dutyCycle}
                                 onChange={(e) => handleInputChange('dutyCycle', e.target.value)}
-                                placeholder="Enter duty cycle"
+                                placeholder="Enter duty cycle (0-1)"
                             />
                         </div>
 
-                        <div className="form-group">
-                            <label>Time Lasted:</label>
+                      <div className="form-group">
+                            <label>
+                                Time Lasted (hours):
+                                <span className="range-hint">(&gt; 0)</span>
+                            </label>
                             <input
                                 type="number"
                                 step="0.01"
+                                min="0.01"
                                 value={newPrediction.timeLasted}
                                 onChange={(e) => handleInputChange('timeLasted', e.target.value)}
                                 placeholder="Enter time lasted"
                             />
                         </div>
-
                         <div className="form-group">
-                            <label>Temperature:</label>
+                            <label>
+                                Temperature (°C):
+                                <span className="range-hint">(18 - 28)</span>
+                            </label>
                             <input
                                 type="number"
                                 step="0.01"
+                                min="18"
+                                max="28"
                                 value={newPrediction.temperature}
                                 onChange={(e) => handleInputChange('temperature', e.target.value)}
-                                placeholder="Enter temperature"
+                                placeholder="Enter temperature (18-28°C)"
                             />
                         </div>
 
                         <div className="button-group">
-                            <button onClick={handleCreate}>Create</button>
-                            <button onClick={handleCancel}>Cancel</button>
+                            <button className="primary-button" onClick={handleCreate}>Create</button>
+                            <button className="secondary-button" onClick={handleCancel}>Cancel</button>
                         </div>
                     </div>
                 </div>

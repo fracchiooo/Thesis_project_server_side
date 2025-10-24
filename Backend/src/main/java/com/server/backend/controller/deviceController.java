@@ -1,10 +1,13 @@
 package com.server.backend.controller;
 
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Date;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -69,10 +72,15 @@ public class deviceController {
     }
 
     @GetMapping("/getDeviceLogsPages/{devEUI}")
-    public Page<DeviceStatusLogs> DeviceStatusLogsPages(@PathVariable String deviceEUI, @RequestParam Date start_date, @RequestParam Date finish_date, 
+    public Page<DeviceStatusLogs> DeviceStatusLogsPages(@PathVariable String devEUI, 
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start_date,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime finish_date, 
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "50") int size) {
-        return deviceServ.getLogsByCustomDateRange(deviceEUI, start_date, finish_date, page, size);
+
+            Date startDate = Date.from(start_date.toInstant(ZoneOffset.UTC));
+            Date finishDate = Date.from(finish_date.toInstant(ZoneOffset.UTC));
+            return deviceServ.getLogsByCustomDateRange(devEUI, startDate, finishDate, page, size);
     }
     
     

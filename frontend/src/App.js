@@ -3,6 +3,7 @@ import Login from './components/User/Login.tsx';
 import UserSubscription from './components/User/SignUp.tsx';
 import PredictionPage from './components/Prediction/PredictionPage.tsx';
 import DevicePage from './components/Device/DevicePage.tsx';
+import DeviceStatusLogPage from './components/Device/DeviceStatusLogPage.tsx';
 
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
@@ -22,6 +23,7 @@ function App() {
         <Route path="/predictions" element={<PredictionPage/>} />
         <Route path="/devices" element={<DevicePage/>} />
         <Route path="*" element={<h1>Page not found</h1>} />
+        <Route path="/device/:deviceEUI" element={<DeviceStatusLogPage />} />
       </Routes>
     </Router>
   );
