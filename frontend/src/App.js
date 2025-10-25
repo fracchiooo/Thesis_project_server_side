@@ -34,16 +34,21 @@ function HomePage() {
   const isLoggedIn = localStorage.getItem('authToken') != null;
   const navigate = useNavigate(); // Ora funziona!
 
-  const handleSearch = (query) => {
-    navigate(`/results?query=${encodeURIComponent(query)}`);
-  };
-
   const handleSignUp = () => {
-    navigate('/signup'); // Usa navigate invece di window.location
+    navigate('/signup');
   };
 
   const handleLogin = () => {
-    navigate('/login'); // Usa navigate invece di window.location
+    navigate('/login');
+  };
+    
+  
+  const handlePredictions = () => {
+    navigate('/predictions');
+  };
+
+  const handleDevices = () => {
+    navigate('/devices');
   };
 
   const handleLogout = () => {
@@ -60,6 +65,9 @@ function HomePage() {
         <div className="button-container">
           {/* <SearchBar onSearch={handleSearch} /> */}
           <button className="logout-button" onClick={handleLogout}>Logout</button>
+            <button className="devices-button" onClick={handleDevices}>My Devices</button>
+          <button className="predictions-button" onClick={handlePredictions}>My Predictions</button>
+
         </div>
       ) : (
         <div className="button-container">

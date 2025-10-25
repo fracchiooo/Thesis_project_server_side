@@ -60,7 +60,6 @@ const PredictionPage = () => {
     const validatePrediction = (): boolean => {
         const errors: string[] = [];
 
-        // Validazione campi obbligatori
         if (!newPrediction.initialConcentration || !newPrediction.frequency || 
             !newPrediction.dutyCycle || !newPrediction.timeLasted || !newPrediction.temperature) {
             errors.push('All fields are required');
@@ -74,22 +73,18 @@ const PredictionPage = () => {
         const initialConcentration = parseFloat(newPrediction.initialConcentration);
         const timeLasted = parseFloat(newPrediction.timeLasted);
 
-        // Validazione range frequency (0-40 Hz)
         if (isNaN(frequency) || frequency < 0 || frequency > 40) {
             errors.push('Frequency must be between 0 and 40 Hz');
         }
 
-        // Validazione range dutyCycle (0-1)
-        if (isNaN(dutyCycle) || dutyCycle < 0 || dutyCycle > 1) {
-            errors.push('Duty Cycle must be between 0 and 1');
+        if (isNaN(dutyCycle) || dutyCycle < 0 || dutyCycle > 100) {
+            errors.push('Duty Cycle must be between 0 and 100%');
         }
 
-        // Validazione range temperature (18-28°C)
         if (isNaN(temperature) || temperature < 18 || temperature > 28) {
             errors.push('Temperature must be between 18 and 28°C');
         }
 
-        // Validazione valori positivi
         if (isNaN(initialConcentration) || initialConcentration <= 0) {
             errors.push('Initial Concentration must be greater than 0');
         }
@@ -105,7 +100,6 @@ const PredictionPage = () => {
     const handleCreate = async () => {
         if (token == null) throw new Error("the token is null");
 
-        // Validazione
         if (!validatePrediction()) {
             return;
         }
@@ -116,7 +110,7 @@ const PredictionPage = () => {
         const predictionDto = {
             initialConcentration: Number(newPrediction.initialConcentration),
             frequency: Number(newPrediction.frequency),
-            dutyCycle: Number(newPrediction.dutyCycle),
+            dutyCycle: Number(newPrediction.dutyCycle) / 100,
             timeLasted: Number(newPrediction.timeLasted),
             temperature: Number(newPrediction.temperature)
         };
@@ -203,36 +197,30 @@ const PredictionPage = () => {
         try {
             setLoading(true);
             let successCount = 0;
-            
-            for (const prediction of selectedData) {
-                if (!prediction.id) {
-                    console.error('Prediction without ID:', prediction);
-                    continue;
-                }
 
-                const dataDto = {
-                    id: prediction.id.valueOf(),
-                    initialConcentration: prediction.initialConcentration?.valueOf() || 0,
-                    frequency: prediction.frequency?.valueOf() || 0,
-                    dutyCycle: prediction.dutyCycle?.valueOf() || 0,
-                    timeLasted: prediction.timeLasted?.valueOf() || 0,
-                    temperature: prediction.temperature?.valueOf() || 0,
-                    observedConcentration: prediction.observedConcentration?.valueOf() || 0
-                };
+            for (const pred of selectedData) {
+                try {
+                    const datasetDto = {
+                        id: pred.id,
+                        initialConcentration: pred.initialConcentration,
+                        frequency: pred.frequency,
+                        dutyCycle: pred.dutyCycle,
+                        timeLasted: pred.timeLasted,
+                        temperature: pred.temperature,
+                        observedConcentration: pred.observedConcentration
+                    };
 
-                console.log('Sending dataDto:', dataDto);
-
-                await axios.post(
-                    "http://localhost:3000/prediction/addData",
-                    dataDto,
-                    {
+                    await axios.post("http://localhost:3000/prediction/addData", datasetDto, {
                         headers: {
                             Authorization: `Bearer ${tokenParsed}`,
                             'Content-Type': 'application/json'
                         }
-                    }
-                );
-                successCount++;
+                    });
+
+                    successCount++;
+                } catch (err: any) {
+                    console.error(`Error adding prediction ${pred.id} to dataset:`, err);
+                }
             }
 
             alert(`Successfully added ${successCount} prediction(s) to dataset!`);
@@ -385,17 +373,17 @@ const PredictionPage = () => {
 
                         <div className="form-group">
                             <label>
-                                Duty Cycle:
-                                <span className="range-hint">(0 - 1)</span>
+                                Duty Cycle (%):
+                                <span className="range-hint">(0 - 100)</span>
                             </label>
                             <input
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                max="1"
+                                max="100"
                                 value={newPrediction.dutyCycle}
                                 onChange={(e) => handleInputChange('dutyCycle', e.target.value)}
-                                placeholder="Enter duty cycle (0-1)"
+                                placeholder="Enter duty cycle (0-100%)"
                             />
                         </div>
 

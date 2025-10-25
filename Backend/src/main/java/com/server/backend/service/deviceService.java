@@ -60,6 +60,13 @@ public class deviceService {
     private EntityManager entityManager;
 
 
+  
+    public ResponseEntity<List<Device>> getAllDevicesOfUser() {
+        List<Device> devices = deviceRepo.findByUserUsername(JWTContext.get());
+        return ResponseEntity.ok(devices);
+    }  
+
+
     public ResponseEntity<StatusDto> getStatus(String devEUI) {
         Optional<Device> dev = deviceRepo.findById(devEUI);
 
@@ -153,7 +160,7 @@ public class deviceService {
 
 
     public ResponseEntity<List<Device>> getAllDevices() {
-        List<Device> devices = deviceRepo.findByUserUsername(JWTContext.get());
+        List<Device> devices = deviceRepo.findAll();
         return ResponseEntity.ok(devices);
     }
 

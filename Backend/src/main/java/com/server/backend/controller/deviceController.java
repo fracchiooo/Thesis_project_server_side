@@ -46,8 +46,8 @@ public class deviceController {
     }
 
     @GetMapping("/list")
-    public ResponseEntity<List<Device>> getAllDevices() {
-        return deviceServ.getAllDevices();
+    public ResponseEntity<List<Device>> getAllDevicesOfUser() {
+        return deviceServ.getAllDevicesOfUser();
     }
     
     
