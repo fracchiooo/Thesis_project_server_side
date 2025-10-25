@@ -77,7 +77,7 @@ public class deviceService {
     }
 
     public ResponseEntity<List<StatusDto>> getAllStatusses() {
-        List<Device> devices = deviceRepo.findAll();
+        List<Device> devices = deviceRepo.findByUserUsername(JWTContext.get());
 
         if(devices.isEmpty()){
             return ResponseEntity.noContent().build();
@@ -94,7 +94,7 @@ public class deviceService {
 
     public ResponseEntity<Object> sendCommand(CommandDto commandDto, String devEUI) {
 
-        Optional<Device> dev = deviceRepo.findById(devEUI);
+        Optional<Device> dev = deviceRepo.findByDeviceEUIAndUserUsername(devEUI, JWTContext.get());
         if(dev.isEmpty()){
             return ResponseEntity.notFound().build();
         }
@@ -135,23 +135,25 @@ public class deviceService {
     }
 
     public ResponseEntity<Object> deleteDevice(String devEUI) {
+
+        Optional<Device> d = deviceRepo.findByDeviceEUIAndUserUsername(devEUI, JWTContext.get());
+        if(d.isEmpty()){
+            return ResponseEntity.notFound().build(); 
+        }
         try{
             mqttSubscriber.unsubscribe(devEUI);
         } catch (MqttException e){
             System.out.println("Failed in unsubscribing the device: " + devEUI + " from its topic");
         }
 
-        return deviceRepo.findById(devEUI).map(device -> {
-            deviceRepo.delete(device);
-            deviceRepo.flush();
-            return ResponseEntity.ok().build();
-        }).orElse(ResponseEntity.notFound().build());
-
+        deviceRepo.delete(d.get());
+        deviceRepo.flush();
+        return ResponseEntity.ok().build();
     }
 
 
     public ResponseEntity<List<Device>> getAllDevices() {
-        List<Device> devices = deviceRepo.findAll();
+        List<Device> devices = deviceRepo.findByUserUsername(JWTContext.get());
         return ResponseEntity.ok(devices);
     }
 

@@ -17,7 +17,9 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onDelete }) => {
     const [commandData, setCommandData] = useState({
         frequency: '',
         duty_frequency: '',
-        finish_after: '',
+        finish_after_hours: '',
+        finish_after_minutes: '',
+        finish_after_seconds: '',
         startTime: ''
     });
     const [validationErrors, setValidationErrors] = useState<string[]>([]);
@@ -35,6 +37,15 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onDelete }) => {
         }
     };
 
+    // Converti ore, minuti, secondi in ore decimali
+    const convertToDecimalHours = (hours: string, minutes: string, seconds: string): number => {
+        const h = parseFloat(hours) || 0;
+        const m = parseFloat(minutes) || 0;
+        const s = parseFloat(seconds) || 0;
+        
+        return h + (m / 60.0) + (s / 3600.0);
+    };
+
     const handleCardClick = () => {
         navigate(`/device/${cleanDeviceEUI}`);
     };
@@ -49,29 +60,60 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onDelete }) => {
         const errors: string[] = [];
 
         // Validazione campi obbligatori
-        if (!commandData.frequency || !commandData.duty_frequency || !commandData.finish_after) {
-            errors.push('All required fields must be filled');
+        if (!commandData.frequency || !commandData.duty_frequency) {
+            errors.push('Frequency and Duty Frequency are required');
             setValidationErrors(errors);
             return false;
         }
 
+        // Verifica che almeno uno dei campi tempo sia compilato
+        const hasTime = commandData.finish_after_hours || 
+                       commandData.finish_after_minutes || 
+                       commandData.finish_after_seconds;
+        
+        if (!hasTime) {
+            errors.push('At least one time field (hours, minutes, or seconds) must be filled');
+        }
+
         const frequency = parseFloat(commandData.frequency);
         const dutyFrequency = parseFloat(commandData.duty_frequency);
-        const finishAfter = parseFloat(commandData.finish_after);
 
         // Validazione range frequency (0-40 Hz)
         if (isNaN(frequency) || frequency < 0 || frequency > 40) {
             errors.push('Frequency must be between 0 and 40 Hz');
         }
 
-        // Validazione range duty_frequency (0-1)
+        // Validazione range duty_frequency (20-100)
         if (isNaN(dutyFrequency) || dutyFrequency < 20 || dutyFrequency > 100) {
             errors.push('Duty Frequency must be between 20 and 100');
         }
 
         // Validazione finish_after (maggiore di 0)
-        if (isNaN(finishAfter) || finishAfter <= 0) {
-            errors.push('Finish After must be greater than 0');
+        const finishAfterHours = convertToDecimalHours(
+            commandData.finish_after_hours,
+            commandData.finish_after_minutes,
+            commandData.finish_after_seconds
+        );
+
+        if (finishAfterHours <= 0) {
+            errors.push('Total duration must be greater than 0');
+        }
+
+        // Validazione valori negativi per tempo
+        const hours = parseFloat(commandData.finish_after_hours) || 0;
+        const minutes = parseFloat(commandData.finish_after_minutes) || 0;
+        const seconds = parseFloat(commandData.finish_after_seconds) || 0;
+
+        if (hours < 0 || minutes < 0 || seconds < 0) {
+            errors.push('Time values cannot be negative');
+        }
+
+        if (minutes >= 60) {
+            errors.push('Minutes must be less than 60');
+        }
+
+        if (seconds >= 60) {
+            errors.push('Seconds must be less than 60');
         }
 
         // Validazione startTime (opzionale, ma se presente deve essere futura)
@@ -105,10 +147,17 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onDelete }) => {
         try {
             setIsSending(true);
 
+            // Converti il tempo in ore decimali
+            const finishAfterHours = convertToDecimalHours(
+                commandData.finish_after_hours,
+                commandData.finish_after_minutes,
+                commandData.finish_after_seconds
+            );
+
             const commandDto: any = {
                 frequency: parseFloat(commandData.frequency),
                 duty_frequency: parseFloat(commandData.duty_frequency),
-                finish_after: parseFloat(commandData.finish_after)
+                finish_after: finishAfterHours
             };
 
             // Aggiungi startTime solo se specificato
@@ -132,7 +181,9 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onDelete }) => {
             setCommandData({
                 frequency: '',
                 duty_frequency: '',
-                finish_after: '',
+                finish_after_hours: '',
+                finish_after_minutes: '',
+                finish_after_seconds: '',
                 startTime: ''
             });
             setValidationErrors([]);
@@ -149,7 +200,9 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onDelete }) => {
         setCommandData({
             frequency: '',
             duty_frequency: '',
-            finish_after: '',
+            finish_after_hours: '',
+            finish_after_minutes: '',
+            finish_after_seconds: '',
             startTime: ''
         });
         setValidationErrors([]);
@@ -260,8 +313,8 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onDelete }) => {
                             <input
                                 type="number"
                                 step="0.01"
-                                min="0"
-                                max="1"
+                                min="20"
+                                max="100"
                                 value={commandData.duty_frequency}
                                 onChange={(e) => setCommandData(prev => ({ ...prev, duty_frequency: e.target.value }))}
                                 placeholder="Enter duty frequency (20-100)"
@@ -271,17 +324,55 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onDelete }) => {
 
                         <div className="form-group">
                             <label>
-                                Finish After (minutes): <span className="required">*</span>
+                                Duration: <span className="required">*</span>
                             </label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                min="0.01"
-                                value={commandData.finish_after}
-                                onChange={(e) => setCommandData(prev => ({ ...prev, finish_after: e.target.value }))}
-                                placeholder="Enter duration (minutes)"
-                                required
-                            />
+                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                <div style={{ flex: 1 }}>
+                                    <input
+                                        type="number"
+                                        step="1"
+                                        min="0"
+                                        value={commandData.finish_after_hours}
+                                        onChange={(e) => setCommandData(prev => ({ 
+                                            ...prev, 
+                                            finish_after_hours: e.target.value 
+                                        }))}
+                                        placeholder="Hours"
+                                    />
+                                    <small>hours</small>
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    <input
+                                        type="number"
+                                        step="1"
+                                        min="0"
+                                        max="59"
+                                        value={commandData.finish_after_minutes}
+                                        onChange={(e) => setCommandData(prev => ({ 
+                                            ...prev, 
+                                            finish_after_minutes: e.target.value 
+                                        }))}
+                                        placeholder="Minutes"
+                                    />
+                                    <small>minutes</small>
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    <input
+                                        type="number"
+                                        step="1"
+                                        min="0"
+                                        max="59"
+                                        value={commandData.finish_after_seconds}
+                                        onChange={(e) => setCommandData(prev => ({ 
+                                            ...prev, 
+                                            finish_after_seconds: e.target.value 
+                                        }))}
+                                        placeholder="Seconds"
+                                    />
+                                    <small>seconds</small>
+                                </div>
+                            </div>
+                            <small className="form-hint">Fill at least one field</small>
                         </div>
 
                         <div className="form-group">
