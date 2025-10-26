@@ -919,7 +919,6 @@ def predict():
                 'message': pred_result['message']
             }), 400
 
-        # Converti numpy arrays in liste
         result = pred_result['result']
         result['gompertz']['quantiles'] = result['gompertz']['quantiles'].tolist()
         

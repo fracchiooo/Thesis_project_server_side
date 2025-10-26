@@ -63,9 +63,8 @@ function HomePage() {
       
       {isLoggedIn ? (
         <div className="button-container">
-          {/* <SearchBar onSearch={handleSearch} /> */}
           <button className="logout-button" onClick={handleLogout}>Logout</button>
-            <button className="devices-button" onClick={handleDevices}>My Devices</button>
+          <button className="devices-button" onClick={handleDevices}>My Devices</button>
           <button className="predictions-button" onClick={handlePredictions}>My Predictions</button>
 
         </div>
