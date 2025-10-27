@@ -569,19 +569,6 @@ class GNN:
 class Model:
     def __init__(self, hyperparams=None, observed_data=[], mcmc_params=None, M=2):
 
-        """
-        observed_data: List of dicts with keys:
-        [
-            {
-                'environmental': [T_norm, pH_norm, NaCl_norm],
-                'time': t,
-                'initial_pop': N_0, 
-                'observed_concentration': N_observed
-            },
-            ...
-        ]
-        """
-
         if mcmc_params is None:
             mcmc_params = {
                 'num_samples': 20000,
@@ -596,8 +583,10 @@ class Model:
 
         self.is_trained = False
 
-    def update_trainset(self, new_observed_data):
+    def update_trainset_and_params(self, new_observed_data, mcmc_params=None):
         """Updates the training dataset"""
+        if not mcmc_params is None:
+            self.mcmc_params=mcmc_params
         self.observed_data = new_observed_data
         self.is_trained = False
         self.samples = []
@@ -609,7 +598,7 @@ class Model:
         """
         if len(self.observed_data)==0:
             return {'success': False, 'message': 'No dataset provided'}
-        
+
         try:
             # Executes MCMC inference
             self.samples = self.gnn.mcmc_inference(
@@ -949,7 +938,12 @@ def train():
             new_observed_data = divide_train_test_result['observed']
             new_test_data = divide_train_test_result['test']
 
-            model.update_trainset(new_observed_data)
+            mcmc_params = {
+                'num_samples': 300000,
+                'burn_in': 100000,
+                'thin': 1000
+            }
+            model.update_trainset_and_params(new_observed_data, mcmc_params)
             fit_result = model.fit()
             
             if not fit_result['success']:
@@ -1037,7 +1031,6 @@ def addData():
 if __name__ == '__main__':
     print("Starting Bayesian Neural Network model...")
     
-    
     all_data = []
     observed_data = []
     test_data = []
@@ -1063,11 +1056,10 @@ if __name__ == '__main__':
     elif(len(all_data)>0):
         print("Training a new model")
         
-
         mcmc_params = {
-            'num_samples': 4000,
-            'burn_in': 1000,
-            'thin': 1
+            'num_samples': 300000,
+            'burn_in': 100000,
+            'thin': 1000
         }
 
         model = Model(observed_data=observed_data, M=3, mcmc_params=mcmc_params)
