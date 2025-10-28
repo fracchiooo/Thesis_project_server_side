@@ -26,6 +26,8 @@ services:
       - "5001:5001"
     environment:
       - MODEL_API_KEY=${MODEL_API_KEY:-default_api_key}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     restart: unless-stopped
     networks:
       - app-network
@@ -34,6 +36,13 @@ services:
       - type: bind
         source: ../dataset_conf
         target: /app/dataset_conf
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
 
   postgresql:

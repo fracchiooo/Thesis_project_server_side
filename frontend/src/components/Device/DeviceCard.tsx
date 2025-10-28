@@ -78,9 +78,9 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onDelete }) => {
         const frequency = parseFloat(commandData.frequency);
         const dutyFrequency = parseFloat(commandData.duty_frequency);
 
-        // Validazione range frequency (0-40 Hz)
+        // Validazione range frequency (0-40 kHz)
         if (isNaN(frequency) || frequency < 0 || frequency > 40) {
-            errors.push('Frequency must be between 0 and 40 Hz');
+            errors.push('Frequency must be between 0 and 40 kHz');
         }
 
         // Validazione range duty_frequency (20-100)
@@ -258,7 +258,7 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onDelete }) => {
                         <span className="info-label">Frequency:</span>
                         <span className="info-value">
                             {device.currentSensedFrequency != null 
-                                ? `${device.currentSensedFrequency} Hz` 
+                                ? `${device.currentSensedFrequency} kHz` 
                                 : 'N/A'}
                         </span>
                     </div>
@@ -290,7 +290,7 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onDelete }) => {
 
                         <div className="form-group">
                             <label>
-                                Frequency (Hz): <span className="required">*</span>
+                                Frequency (kHz): <span className="required">*</span>
                                 <span className="range-hint">(0 - 40)</span>
                             </label>
                             <input
@@ -300,7 +300,7 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onDelete }) => {
                                 max="40"
                                 value={commandData.frequency}
                                 onChange={(e) => setCommandData(prev => ({ ...prev, frequency: e.target.value }))}
-                                placeholder="Enter frequency (0-40 Hz)"
+                                placeholder="Enter frequency (0-40 kHz)"
                                 required
                             />
                         </div>

@@ -18,6 +18,18 @@ tfk = tf.keras
 tfkl = tf.keras.layers
 
 
+physical_devices = tf.config.list_physical_devices('GPU')
+if physical_devices:
+    try:
+        for device in physical_devices:
+            tf.config.experimental.set_memory_growth(device, True)
+        print(f"GPU disponibile: {physical_devices}")
+    except RuntimeError as e:
+        print(f"Error in configuring GPU: {e}")
+else:
+    print("WARNING: NO GPU DETECTED")
+
+
 
 
 class GNN:
@@ -58,23 +70,37 @@ class GNN:
         self.is_trained = False
 
     @staticmethod
+    @tf.function  # JIT compilation: compila la funzione in un grafo TensorFlow ottimizzato
     def gompertz_function(t, N0, D, mu, lambda_p):
         # Gompertz function with learned params D, mu, lambda
-        e = np.exp(1) # Euler's number
-        D_safe = np.maximum(D, 1e-6)
+        # Teoria: La funzione di Gompertz modella crescita con asintoto: N(t) = N0 + D*exp(-exp(exponent))
+        # dove exponent controlla la forma sigmoide della curva
+        e = tf.constant(np.e, dtype=tf.float32)  # Euler's number
+        D_safe = tf.maximum(D, 1e-6)
         exponent = 1.0 + (mu * e * (lambda_p - t)) / D_safe
         return N0 + D_safe * tf.exp(-tf.exp(exponent))
 
     @staticmethod
     def error_model(gompertz_prediction, sigma_squared, v=0.5):
-        """εₜᵢⱼ|gₜᵢⱼ, σ, v ∼ N(0, σ²g(tᵢⱼ)ᵛ) , v=0.5"""
+        """εₜᵢⱼ|gₜᵢⱼ, σ, v ∼ N(0, σ²g(tᵢⱼ)ᵛ) , v=0.5
+        
+        Teoria del modello di errore eteroschedastico:
+        - La varianza dell'errore dipende dalla predizione: σ²*g(t)^v
+        - v=0.5
+        """
     
-        std_dev= np.sqrt(sigma_squared * np.power(gompertz_prediction, v))
+        std_dev = tf.sqrt(sigma_squared * tf.pow(gompertz_prediction, v))
         return tfd.Normal(loc=0.0, scale=std_dev)
 
 
     def sample_new_hierarchical_parameters(self):
-        """Samples the hierarchical parameters according to the prior distributions"""
+        """Samples the hierarchical parameters according to the prior distributions
+        
+        Teoria della gerarchia Bayesiana (3 livelli):
+        LIVELLO 1 (osservazioni): y ~ N(f(x), σ²g^v)
+        LIVELLO 2 (pesi rete): β,γ ~ N(m_i, σ²_β/γ)
+        LIVELLO 3 (iperparametri): m_i ~ N(m_0, σ²/c), σ² ~ InvGamma(d/2)
+        """
 
         # m_0β (super mean) is the mean value around which the means of the beta weights (m_iβ) are centered.
         # m_iβ (i app. 1,2,3) are the means for each of the three beta weights which estimates rispectively D, μ, λ.
@@ -91,8 +117,8 @@ class GNN:
         sigma_gamma_squared = 1.0 / precision_gamma # is the variance of the γ weights
         
         # Step 2: m_γ|σ²_γ ~ N(0, σ²_γ/c_γ * I)
-        m_gamma_dist = tfd.Normal(0.0, np.sqrt(sigma_gamma_squared / self.hyperparams["c_gamma"])) # c_gamma controls the variance of m_gamma, where a higher value means a smaller variance, so m_gamma close to 0.
-        m_gamma = m_gamma_dist.sample([3]).numpy()  # Per [T, pH, NaCl]
+        m_gamma_dist = tfd.Normal(0.0, tf.sqrt(sigma_gamma_squared / self.hyperparams["c_gamma"])) # c_gamma controls the variance of m_gamma, where a higher value means a smaller variance, so m_gamma close to 0.
+        m_gamma = m_gamma_dist.sample([3])  # Per [T, pH, NaCl]
 
 
         # Step 3: σ²_β ~ 1/G(d_β1/2, d_β2/2) 
@@ -106,12 +132,11 @@ class GNN:
         for i in range(3):
             m_0_beta_dist = tfd.Normal(
                 self.hyperparams['m_0_beta_means'][i],  # Media specifica per parametro
-                np.sqrt(sigma_beta_squared / self.hyperparams["e_beta"])
+                tf.sqrt(sigma_beta_squared / self.hyperparams["e_beta"])
             )
-            m_0_beta.append(m_0_beta_dist.sample().numpy())
+            m_0_beta.append(m_0_beta_dist.sample())
 
         m_0_beta = tf.stack(m_0_beta)
-        m_0_beta = np.array(m_0_beta)
 
         # m_0_beta_dist = tfd.Normal(0.0, np.sqrt(sigma_beta_squared / self.hyperparams["e_beta"]))  # e_beta controls the variance of m_0beta, where a higher value means a smaller variance, so m_0β close to 0.
         # m_0_beta = m_0_beta_dist.sample()
@@ -124,19 +149,18 @@ class GNN:
                 # m_μβ, m_λβ ~ TruncatedNormal([0, ∞))
                 m_i_beta_dist = tfd.TruncatedNormal(
                     loc=m_0_beta[i],
-                    scale=np.sqrt(sigma_beta_squared / self.hyperparams["c_beta"]),
+                    scale=tf.sqrt(sigma_beta_squared / self.hyperparams["c_beta"]),
                     low=0.0,
                     high=np.inf
                 )
             else:  # D - Normal standard
                 m_i_beta_dist = tfd.Normal(
                     m_0_beta[i], 
-                    np.sqrt(sigma_beta_squared / self.hyperparams["c_beta"])
+                    tf.sqrt(sigma_beta_squared / self.hyperparams["c_beta"])
                 )
-            m_i_beta.append(m_i_beta_dist.sample().numpy())
+            m_i_beta.append(m_i_beta_dist.sample())
 
         m_i_beta = tf.stack(m_i_beta)
-        m_i_beta = np.array(m_i_beta)
         #m_i_beta_dist = tfd.Normal(m_0_beta, np.sqrt(sigma_beta_squared / self.hyperparams["c_beta"])) # c_beta controls the variance of m_ibeta (i=1,2,3), where a higher value means a smaller variance, so m_ibeta close to m_0β.
         #m_i_beta = m_i_beta_dist.sample([3])  # Per [D, μ, λ]
         
@@ -153,7 +177,8 @@ class GNN:
         }
     
     def sample_new_network_weights(self, hierarchical_params):
-        """Samples the network weights according to the prior distributions"""
+        """Samples the network weights according to the prior distributions
+        """
         
         # β_ik|m_iβ, σ²_β ~ N(m_iβ, σ²_β)
         beta_weights = []
@@ -161,64 +186,60 @@ class GNN:
             if i == 1 or i == 2:  # μ and λ >=0
                 beta_i_dist = tfd.TruncatedNormal(
                     loc=hierarchical_params['m_i_beta'][i], 
-                    scale=np.sqrt(hierarchical_params['sigma_beta_squared']),
+                    scale=tf.sqrt(hierarchical_params['sigma_beta_squared']),
                     low=0.0,
                     high=np.inf
                 )
             else:
                 beta_i_dist = tfd.Normal(
                     hierarchical_params['m_i_beta'][i], 
-                    np.sqrt(hierarchical_params['sigma_beta_squared'])
+                    tf.sqrt(hierarchical_params['sigma_beta_squared'])
                 )
-            beta_i = beta_i_dist.sample([self.HIDDEN_UNITS]).numpy()
+            beta_i = beta_i_dist.sample([self.HIDDEN_UNITS])
             beta_weights.append(beta_i)
         
         # γ_k|m_γ, σ²_γ ~ N(m_γ, σ²_γ I)
-
         gamma_k_dist = tfd.Normal(
         hierarchical_params['m_gamma'],  # [3]
-        np.sqrt(hierarchical_params['sigma_gamma_squared'])
+        tf.sqrt(hierarchical_params['sigma_gamma_squared'])
         )
-        # Sample [HIDDEN_UNITS, 3] in una volta
-        gamma_weights = gamma_k_dist.sample([self.HIDDEN_UNITS]).numpy()
+        # Sample [HIDDEN_UNITS, 3]
+        gamma_weights = gamma_k_dist.sample([self.HIDDEN_UNITS])
         
-        """
-        gamma_weights = []
-        for k in range(self.HIDDEN_UNITS):
-            gamma_k_dist = tfd.Normal(
-                hierarchical_params['m_gamma'],
-                np.sqrt(hierarchical_params['sigma_gamma_squared'])
-            )
-            gamma_k = gamma_k_dist.sample().numpy()  # Shape [3] per [T, pH, NaCl]
-            gamma_weights.append(gamma_k)
-        """
         
         return {
-            'beta': np.array(beta_weights),  # List of 3 vectors, each one of length num_hidden
-            'gamma': gamma_weights  # List of num_hidden vectors, each one of length 3
+            'beta': tf.stack(beta_weights),  # [3, HIDDEN_UNITS] - TF tensor
+            'gamma': gamma_weights  # [HIDDEN_UNITS, 3] - TF tensor
         }
     
+    @tf.function  # JIT compilation per ottimizzazione automatica
     def forward_pass(self, environmental_data, weights):
-        """Forward pass between the neural network, using the current weights and estimating the Gompertz parameters"""
-        # environmental_data: [3] = [T_norm, pH_norm, NaCl_norm]
+        """Forward pass between the neural network, using the current weights and estimating the Gompertz parameters
+        
+        Teoria dell'architettura di rete:
+        INPUT (env data) → HIDDEN (sigmoid activation) → OUTPUT (parametri Gompertz)
+        
+        The Sigmoid activation function in the hidden layer introduces non linearity
+        """
+        # environmental_data: [3] = [Duty, Frequency, Temperature]
         # weights['gamma']: [HIDDEN_UNITS, 3]
         # weights['beta']: [3, HIDDEN_UNITS]
 
-        is_single = (np.array(environmental_data).ndim == 1) #if single prediction or batch training error calculation
+        is_single = (len(tf.shape(environmental_data)) == 1) #if single prediction or batch training error calculation
 
         # if batch calculation (training)
-        env_data = np.atleast_2d(environmental_data)  # [N, 3] o [1, 3]
+        env_data = tf.reshape(environmental_data, [-1, 3])  # [N, 3] o [1, 3]
         
         # input → hidden
         # env_data: [N, 3] @ gamma.T: [3, HIDDEN_UNITS] = [N, HIDDEN_UNITS]
-        hidden_inputs = np.dot(env_data, weights['gamma'].T)  # [N, HIDDEN_UNITS]
-        hidden_activations = tf.nn.sigmoid(hidden_inputs).numpy()  # [N, HIDDEN_UNITS]
+        hidden_inputs = tf.matmul(env_data, weights['gamma'], transpose_b=True)  # [N, HIDDEN_UNITS]
+        hidden_activations = tf.nn.sigmoid(hidden_inputs)  # [N, HIDDEN_UNITS]
         
         # hidden → parametri Gompertz
         # hidden_activations: [N, HIDDEN_UNITS] @ beta[i]: [HIDDEN_UNITS] = [N]
-        D = np.dot(hidden_activations, weights['beta'][0])  # [N]
-        mu = np.dot(hidden_activations, weights['beta'][1])  # [N]
-        lambda_p = np.dot(hidden_activations, weights['beta'][2])  # [N]
+        D = tf.reduce_sum(hidden_activations * weights['beta'][0], axis=1)  # [N]
+        mu = tf.reduce_sum(hidden_activations * weights['beta'][1], axis=1)  # [N]
+        lambda_p = tf.reduce_sum(hidden_activations * weights['beta'][2], axis=1)  # [N]
         
         # Se used for prediction, returns a scalar (scalar input -> scalar output)
         if is_single:
@@ -236,91 +257,86 @@ class GNN:
         """
         return D, mu, lambda_p
 
-    def likelihood_probability(self, observed_data, weights, hierarchical_params):
+    @tf.function  # Calcolo completamente su GPU
+    def likelihood_probability_tf(self, env_data, times, N_0s, N_observed, weights, sigma_squared):
+        """Calcola la log-likelihood
+        
+        Teoria della likelihood: P(data|θ) = Π_i P(y_i|x_i,θ)
+        In log-space: log P(data|θ) = Σ_i log P(y_i|x_i,θ)
+        """
         # calculates log P(dati|parametri) for each data points, assuming independence between data points
         # usage of logaritmis to avoid numerical underflow when multiplying many small probabilities
 
-        env_data = np.array([dp['environmental'] for dp in observed_data])  # [N, 3]
-        times = np.array([dp['time'] for dp in observed_data], dtype=np.float32)  # [N]
-        N_0s = np.array([dp['initial_pop'] for dp in observed_data], dtype=np.float32)  # [N]
-        N_observed = np.array([dp['observed_concentration'] for dp in observed_data], dtype=np.float32)  # [N]
-
-        # neural network prediction
+        # neural network prediction (batch)
         D, mu, lambda_p = self.forward_pass(env_data, weights)
 
-        # Gompertz prediction, using nn predicted params
+        # Gompertz prediction, using nn predicted params (batch)
         gompertz_pred = self.gompertz_function(times, N_0s, D, mu, lambda_p)  # [N]
         
         # errors between observed and predicted data
         errors = N_observed - gompertz_pred  # [N]
-        errors = tf.cast(errors, tf.float32)
         
         # error model Likelihood vectorized
-        error_dist = self.error_model(gompertz_pred, tf.cast(hierarchical_params['sigma_squared'], tf.float32))
-        log_point_likelihoods = error_dist.log_prob(errors).numpy()  # P(εₜᵢⱼ|gₜᵢⱼ, σ, v), the PDF value of the error given the observed correct value - predicted gompertz value
+        # Teoria: La likelihood misura quanto i dati osservati sono probabili dato il modello
+        # Usiamo un modello eteroschedastico dove la varianza cresce con la predizione
+        std_dev = tf.sqrt(sigma_squared * tf.pow(gompertz_pred, 0.5))
+        error_dist = tfd.Normal(loc=0.0, scale=std_dev)
+        log_point_likelihoods = error_dist.log_prob(errors)  # P(εₜᵢⱼ|gₜᵢⱼ, σ, v), the PDF value of the error given the observed correct value - predicted gompertz value
         # so how likely is to observe this error given the predicted value and the error model, the more the error is close to 0, the more likely is to observe it
         # so the more the predicted value is close to the observed value, the more likely is to observe this error, the more the likelihood is high, the more the current weights is good to explain the observed data
 
         # Total likelihood
-        log_total_likelihood = np.sum(log_point_likelihoods)
+        log_total_likelihood = tf.reduce_sum(log_point_likelihoods)
 
-        """ log_total_likelihood = 0.0
-        
-        for data_point in observed_data:
-            env_data = data_point['environmental']  # [T, pH, NaCl] normalizzati
-            t = data_point['time']
-            N_0 = data_point['initial_pop']
-            N_observed = data_point['observed_concentration']
-            
-            # neural network prediction
-            D, mu, lambda_p = self.forward_pass(env_data, weights)
-            
-            # Gompertz prediction, using nn predicted params
-            gompertz_pred = self.gompertz_function(t, N_0, D, mu, lambda_p)
-
-            # error between observed and predicted
-            error = N_observed - gompertz_pred
-            error = tf.cast(error, tf.float32)
-            
-            # error model likelihood
-            error_dist = self.error_model(gompertz_pred, tf.cast(hierarchical_params['sigma_squared'], tf.float32))
-            log_point_likelihood = error_dist.log_prob(error).numpy() # P(εₜᵢⱼ|gₜᵢⱼ, σ, v), the PDF value of the error given the observed correct value - predicted gompertz value
-            # so how likely is to observe this error given the predicted value and the error model, the more the error is close to 0, the more likely is to observe it
-            # so the more the predicted value is close to the observed value, the more likely is to observe this error, the more the likelihood is high, the more the current weights is good to explain the observed data
-            log_total_likelihood += log_point_likelihood # P(data_point_1 & data_point_2 & ... & data_point_n|weights) = Π[P(εₜᵢⱼ|gₜᵢⱼ, σ, v)] for all data points, cause we assume indipendence between data points
-        """
         return log_total_likelihood
-    
-    def prior_probability(self, weights, hierarchical_params):
-        # calculates log P(parametri) wrt weights and hyperparams
 
-        log_total_prior = 0.0
+    def likelihood_probability(self, observed_data, weights, hierarchical_params):
+        """Wrapper che prepara i dati e chiama la versione TF ottimizzata"""
+     
+        env_data = tf.constant([dp['environmental'] for dp in observed_data], dtype=tf.float32)  # [N, 3]
+        times = tf.constant([dp['time'] for dp in observed_data], dtype=tf.float32)  # [N]
+        N_0s = tf.constant([dp['initial_pop'] for dp in observed_data], dtype=tf.float32)  # [N]
+        N_observed = tf.constant([dp['observed_concentration'] for dp in observed_data], dtype=tf.float32)  # [N]
+
+        return self.likelihood_probability_tf(
+            env_data, times, N_0s, N_observed, weights, 
+            tf.cast(hierarchical_params['sigma_squared'], tf.float32)
+        ).numpy()
+    
+        # P(εₜᵢⱼ|gₜᵢⱼ, σ, v), the PDF value of the error given the observed correct value - predicted gompertz value
+        # so how likely is to observe this error given the predicted value and the error model, the more the error is close to 0, the more likely is to observe it
+        # so the more the predicted value is close to the observed value, the more likely is to observe this error, the more the likelihood is high, the more the current weights is good to explain the observed data
+        # P(data_point_1 & data_point_2 & ... & data_point_n|weights) = Π[P(εₜᵢⱼ|gₜᵢⱼ, σ, v)] for all data points, cause we assume indipendence between data points
+
+    
+    @tf.function  # Calcolo prior completamente vettorizzato su GPU
+    def prior_probability_tf(self, beta_weights, gamma_weights, hierarchical_params):
+        """Calcola il log-prior
+        """
+        log_total_prior = tf.constant(0.0, dtype=tf.float32)
         
-        # Prior on β weights
-        # Per ogni i, tutti i beta_i[k] hanno la STESSA distribuzione
+        # Prior on β weights - VETTORIZZATO
+        # Teoria: Ogni β_ik ha prior indipendente centrato su m_iβ
         for i in range(3):
-            beta_i = weights['beta'][i]  # [HIDDEN_UNITS]
+            beta_i = beta_weights[i]  # [HIDDEN_UNITS]
             
             if i == 1 or i == 2:  # μ and λ
                 beta_prior_dist = tfd.TruncatedNormal(
-                    loc=float(hierarchical_params['m_i_beta'][i]),
-                    scale=float(np.sqrt(hierarchical_params['sigma_beta_squared'])),
+                    loc=tf.cast(hierarchical_params['m_i_beta'][i], tf.float32),
+                    scale=tf.cast(tf.sqrt(hierarchical_params['sigma_beta_squared']), tf.float32),
                     low=0.0,
-                    high=np.inf
+                    high=1e10  # Invece di inf per stabilità numerica
                 )
             else:  # D
                 beta_prior_dist = tfd.Normal(
-                    float(hierarchical_params['m_i_beta'][i]),
-                    float(np.sqrt(hierarchical_params['sigma_beta_squared']))
+                    tf.cast(hierarchical_params['m_i_beta'][i], tf.float32),
+                    tf.cast(tf.sqrt(hierarchical_params['sigma_beta_squared']), tf.float32)
                 )
             
             # Tutti i beta_i[k] valutati insieme (stessa distribuzione)
-            log_probs = beta_prior_dist.log_prob(beta_i).numpy()  # [HIDDEN_UNITS]
+            log_probs = beta_prior_dist.log_prob(beta_i)  # [HIDDEN_UNITS]
             
-            if np.any(np.isnan(log_probs)) or np.any(np.isinf(log_probs)):
-                return -np.inf
-            
-            log_total_prior += np.sum(log_probs)
+            log_total_prior += tf.reduce_sum(log_probs)
 
         # P(β_ik|m_iβ, σ²_β) # the PDF value of the beta weight given the hierarchical parameters, 
         # so how likely is to observe this beta weight given the hierarchical parameters, the more the beta weight is close to the mean m_iβ, 
@@ -328,33 +344,33 @@ class GNN:
         # Π[P(β_ik| hyperparams)] for all i,k (i outputs and k hidden units), cause we assume indipendence between weights
         
         
-        # Prior on γ weights
         # Prior on γ weights - VETTORIZZATO con broadcasting
-        gamma_flat = weights['gamma'].flatten()  # [HIDDEN_UNITS * 3]
+        # Teoria: Broadcasting permette di calcolare log-prob per tutti i pesi simultaneamente
+        # Invece di loop su k hidden units, usiamo operazioni tensoriali
+        gamma_flat = tf.reshape(gamma_weights, [-1])  # [HIDDEN_UNITS * 3]
         # Ordine: [γ_00, γ_01, γ_02, γ_10, γ_11, γ_12, ...]
-        m_gamma_expanded = np.tile(hierarchical_params['m_gamma'], self.HIDDEN_UNITS)
+        m_gamma_expanded = tf.tile(hierarchical_params['m_gamma'], [self.HIDDEN_UNITS])
         # Ordine: [m_γ[0], m_γ[1], m_γ[2], m_γ[0], m_γ[1], m_γ[2], ...]
         
         gamma_prior_dist = tfd.Normal(
-            m_gamma_expanded.astype(np.float64),
-            float(np.sqrt(hierarchical_params['sigma_gamma_squared']))
+            tf.cast(m_gamma_expanded, tf.float32),
+            tf.cast(tf.sqrt(hierarchical_params['sigma_gamma_squared']), tf.float32)
         )
+        log_probs = gamma_prior_dist.log_prob(gamma_flat)
         
-        log_probs = gamma_prior_dist.log_prob(gamma_flat).numpy()
+        if tf.reduce_any(tf.math.is_nan(log_probs)) or tf.reduce_any(tf.math.is_inf(log_probs)):
+            return tf.constant(-np.inf, dtype=tf.float32)
         
-        if np.any(np.isnan(log_probs)) or np.any(np.isinf(log_probs)):
-            return -np.inf
-        
-        log_total_prior += np.sum(log_probs)
+        log_total_prior += tf.reduce_sum(log_probs)
                 # P(γ_kj|m_γ, σ²_γ I) # the PDF value of the gamma weight given the hierarchical parameters,
                 # so how likely is to observe this gamma weight given the hierarchical parameters, the more the gamma weight is close to the mean m_γ,
                 # the more likely is to observe it, so the more the prior is high, the more the current gamma weights are good according to the prior knowledge
                 # Π[P(γ_kj| hyperparams)] for all k,j (k hidden units and j inputs), cause we assume indipendence between weights
         
         # Prior on precision hiperparameters
-        log_total_prior += self.precision_beta_dist.log_prob(hierarchical_params['precision_beta']).numpy()
-        log_total_prior += self.precision_gamma_dist.log_prob(hierarchical_params['precision_gamma']).numpy()
-        log_total_prior += self.precision_sigma_dist.log_prob(hierarchical_params['precision_sigma']).numpy()
+        log_total_prior += self.precision_beta_dist.log_prob(hierarchical_params['precision_beta'])
+        log_total_prior += self.precision_gamma_dist.log_prob(hierarchical_params['precision_gamma'])
+        log_total_prior += self.precision_sigma_dist.log_prob(hierarchical_params['precision_sigma'])
 
         # Prior on state hyperparams m_iβ | m_0β, σ²_β
 
@@ -362,73 +378,95 @@ class GNN:
         for i in range(3):
             if i == 1 or i == 2:  # μ and λ
                 m_i_beta_dist = tfd.TruncatedNormal(
-                    loc=float(hierarchical_params['m_0_beta'][i]),
-                    scale=float(np.sqrt(hierarchical_params['sigma_beta_squared'] / self.hyperparams['c_beta'])),
+                    loc=tf.cast(hierarchical_params['m_0_beta'][i], tf.float32),
+                    scale=tf.cast(tf.sqrt(hierarchical_params['sigma_beta_squared'] / self.hyperparams['c_beta']), tf.float32),
                     low=0.0,
-                    high=np.inf
+                    high=1e10
                 )
             else:  # D
                 m_i_beta_dist = tfd.Normal(
-                    float(hierarchical_params['m_0_beta'][i]),
-                    float(np.sqrt(hierarchical_params['sigma_beta_squared'] / self.hyperparams['c_beta']))
+                    tf.cast(hierarchical_params['m_0_beta'][i], tf.float32),
+                    tf.cast(tf.sqrt(hierarchical_params['sigma_beta_squared'] / self.hyperparams['c_beta']), tf.float32)
                 )
-            log_prob = m_i_beta_dist.log_prob(hierarchical_params['m_i_beta'][i]).numpy()
+            log_prob = m_i_beta_dist.log_prob(hierarchical_params['m_i_beta'][i])
             log_total_prior += log_prob      
 
         # Prior on m_0β | σ²_β
         for i in range(3):
             m_0_beta_dist = tfd.Normal(
-                float(self.hyperparams['m_0_beta_means'][i]),  # Media specifica
-                float(np.sqrt(hierarchical_params['sigma_beta_squared'] / self.hyperparams['e_beta']))
+                tf.cast(self.hyperparams['m_0_beta_means'][i], tf.float32),  # Media specifica
+                tf.cast(tf.sqrt(hierarchical_params['sigma_beta_squared'] / self.hyperparams['e_beta']), tf.float32)
             )
-            log_prob = m_0_beta_dist.log_prob(hierarchical_params['m_0_beta'][i]).numpy()
+            log_prob = m_0_beta_dist.log_prob(hierarchical_params['m_0_beta'][i])
             log_total_prior += log_prob 
 
         # Prior on m_γ | σ²_γ a vector of size = number of inputs
         m_gamma_dist = tfd.Normal(
             0.0,
-            float(np.sqrt(hierarchical_params['sigma_gamma_squared'] / self.hyperparams['c_gamma']))
+            tf.cast(tf.sqrt(hierarchical_params['sigma_gamma_squared'] / self.hyperparams['c_gamma']), tf.float32)
         )
-        log_probs = m_gamma_dist.log_prob(hierarchical_params['m_gamma']).numpy()  # [3]
-        log_total_prior += np.sum(log_probs)
+        log_probs = m_gamma_dist.log_prob(hierarchical_params['m_gamma'])  # [3]
+        log_total_prior += tf.reduce_sum(log_probs)
 
         return log_total_prior
+
+    def prior_probability(self, weights, hierarchical_params):
+        """Wrapper che chiama la versione TF ottimizzata"""
+        # calculates log P(parametri) wrt weights and hyperparams
+        return self.prior_probability_tf(
+            weights['beta'], 
+            weights['gamma'], 
+            hierarchical_params
+        ).numpy()
     
 
     def posterior_probability(self, weights, hierarchical_params, observed_data):
-        # log P(parametri|dati) ∝ log P(dati|parametri) + log P(parametri)
+        """log P(parametri|dati) ∝ log P(dati|parametri) + log P(parametri)
+        
+        Teorema di Bayes in log-space:
+        log P(θ|D) = log P(D|θ) + log P(θ)
+                """
         likelihood = self.likelihood_probability(observed_data, weights, hierarchical_params)
         prior = self.prior_probability(weights, hierarchical_params)
         return likelihood + prior
     
 
     def propose_new_state(self, current_weights, current_hierarchical_params, step_size=0.02, iteration=0):
-        """Proposes a new state by perturbing the current weights and hierarchical parameters"""
+        """Proposes a new state by perturbing the current weights and hierarchical parameters
         
+        Teoria della proposta MCMC:
+        - Random Walk Metropolis: q(θ'|θ) = N(θ, σ²I)
+        - Step size adattivo: diminuisce lentamente per convergenza fine
+        """
+        
+        # OTTIMIZZAZIONE: Step size adattivo per convergenza migliore
+        # All'inizio step più grandi per esplorare, poi più piccoli per convergere
         adaptive_step = step_size * (1.0 + 0.3 / (1.0 + iteration / 30000))
 
         # proposes new weights by adding a small gaussian noise to the current weights
+        # NOTA: Manteniamo numpy qui perché è una singola operazione piccola
         new_weights = {
-            'beta': current_weights['beta'] + np.random.normal(0, adaptive_step, current_weights['beta'].shape),
-            'gamma': current_weights['gamma'] + np.random.normal(0, adaptive_step, current_weights['gamma'].shape)
+            'beta': current_weights['beta'] + tf.random.normal(current_weights['beta'].shape, 0, adaptive_step, dtype=tf.float32),
+            'gamma': current_weights['gamma'] + tf.random.normal(current_weights['gamma'].shape, 0, adaptive_step, dtype=tf.float32)
         }
         
         # proposes new hierarchical parameters by adding a small gaussian noise to the current hierarchical parameters
         new_hierarchical_params = copy.deepcopy(current_hierarchical_params)
         new_hierarchical_params['m_0_beta'] = (
             current_hierarchical_params['m_0_beta'] + 
-            np.random.normal(0, adaptive_step, 3)  # 3 perturbazioni indipendenti
+            tf.random.normal([3], 0, adaptive_step, dtype=tf.float32)  # 3 perturbazioni indipendenti
         )
-        new_hierarchical_params['m_gamma'] += np.random.normal(0, adaptive_step, 3) # 3 environmental inputs
-        new_hierarchical_params['m_i_beta'] += np.random.normal(0, adaptive_step, 3) # 3 outputs D, μ, λ
+        new_hierarchical_params['m_gamma'] = current_hierarchical_params['m_gamma'] + tf.random.normal([3], 0, adaptive_step, dtype=tf.float32) # 3 environmental inputs
+        new_hierarchical_params['m_i_beta'] = current_hierarchical_params['m_i_beta'] + tf.random.normal([3], 0, adaptive_step, dtype=tf.float32) # 3 outputs D, μ, λ
         
-        
-        new_hierarchical_params['precision_beta'] = np.exp(np.log(np.maximum(current_hierarchical_params['precision_beta'], 1e-10)) + np.random.normal(0, adaptive_step))
-        new_hierarchical_params['precision_gamma'] = np.exp(np.log(np.maximum(current_hierarchical_params['precision_gamma'], 1e-10)) + np.random.normal(0, adaptive_step))
-        new_hierarchical_params['precision_sigma'] = np.exp(np.log(np.maximum(current_hierarchical_params['precision_sigma'], 1e-10)) + np.random.normal(0, adaptive_step))
-        new_hierarchical_params['precision_beta'] = np.clip(new_hierarchical_params['precision_beta'], 1e-6, 1e6)
-        new_hierarchical_params['precision_gamma'] = np.clip(new_hierarchical_params['precision_gamma'], 1e-6, 1e6)
-        new_hierarchical_params['precision_sigma'] = np.clip(new_hierarchical_params['precision_sigma'], 1e-6, 1e6)
+        # Perturbazione in log-space per precision (sempre positive)
+        # Teoria: log-normal proposal mantiene positività e simmetria in scala logaritmica
+        new_hierarchical_params['precision_beta'] = tf.exp(tf.math.log(tf.maximum(current_hierarchical_params['precision_beta'], 1e-10)) + tf.random.normal([], 0, adaptive_step, dtype=tf.float32))
+        new_hierarchical_params['precision_gamma'] = tf.exp(tf.math.log(tf.maximum(current_hierarchical_params['precision_gamma'], 1e-10)) + tf.random.normal([], 0, adaptive_step, dtype=tf.float32))
+        new_hierarchical_params['precision_sigma'] = tf.exp(tf.math.log(tf.maximum(current_hierarchical_params['precision_sigma'], 1e-10)) + tf.random.normal([], 0, adaptive_step, dtype=tf.float32))
+        new_hierarchical_params['precision_beta'] = tf.clip_by_value(new_hierarchical_params['precision_beta'], 1e-6, 1e6)
+        new_hierarchical_params['precision_gamma'] = tf.clip_by_value(new_hierarchical_params['precision_gamma'], 1e-6, 1e6)
+        new_hierarchical_params['precision_sigma'] = tf.clip_by_value(new_hierarchical_params['precision_sigma'], 1e-6, 1e6)
 
         
         new_hierarchical_params['sigma_beta_squared'] = 1.0 / new_hierarchical_params['precision_beta']
@@ -441,13 +479,18 @@ class GNN:
 
 
     def mcmc_inference(self, observed_data, num_samples, burn_in, thin):
-
-        """
-        Executes MCMC inference to sample from the posterior distribution of the model parameters.        
-        observed_data: Lista of dict with keys:
-                      ['environmental', 'time', 'initial_pop', 'observed_concentration']
+        """Executes MCMC inference to sample from the posterior distribution of the model parameters
+        
+        Teoria Metropolis-Hastings MCMC:
+        1. Proponi nuovo stato θ' ~ q(·|θ)
+        2. Calcola acceptance ratio: α = min(1, P(θ'|D)/P(θ|D))
+        3. Accetta con probabilità α, altrimenti mantieni θ (vecchio stato)
+        4. Dopo burn-in, salva campioni ogni 'thin' iterazioni
+        
+        Questo produce campioni dalla posterior P(θ|D) asintoticamente.
         """
         print("Starting MCMC inference...")
+        
         
         # Initialize current state
         current_hierarchical_params = self.sample_new_hierarchical_parameters()
@@ -457,6 +500,11 @@ class GNN:
         total_proposals = 0 
         samples = []
         
+        # OTTIMIZZAZIONE: Calcola posterior iniziale una volta sola
+        log_current_posterior = self.posterior_probability(
+            current_weights, current_hierarchical_params, observed_data
+        )
+        
         for iteration in range(num_samples + burn_in):
             # Proposes new state
             proposed_weights, proposed_hierarchical_params = self.propose_new_state(
@@ -464,14 +512,17 @@ class GNN:
             )
             
             # Calculate posterior probabilities
-            log_current_posterior = self.posterior_probability(
-                current_weights, current_hierarchical_params, observed_data
-            )
+            # NOTA: Non ricalcoliamo log_current_posterior se accettiamo la proposta
             log_proposed_posterior = self.posterior_probability(
                 proposed_weights, proposed_hierarchical_params, observed_data
             )
             
             # Metropolis-Hastings acceptance
+            # Decide whether to accept the new state
+            # the new state: the better it is: (higher posterior, so it is plausible wrt the prior knowledge (high prior) and 
+            # it fits well the observed data (high likelihood)) , the more likely to be accepted
+            total_proposals += 1  # AGGIUNGI QUESTO
+
             if np.isnan(log_proposed_posterior) or np.isinf(log_proposed_posterior):
                 accept = False
             elif np.isnan(log_current_posterior) or np.isinf(log_current_posterior):
@@ -486,34 +537,31 @@ class GNN:
                     acceptance_ratio = np.exp(log_acceptance_ratio)
                     accept = (np.random.uniform() < acceptance_ratio)
 
-                        
-            # Decide whether to accept the new state
-            # the new state: the better it is: (higher posterior, so it is plausible wrt the prior knowledge (high prior) and 
-            # it fits well the observed data (high likelihood)) , the more likely to be accepted
-            total_proposals += 1  # AGGIUNGI QUESTO
-
             if accept:
                 current_weights = proposed_weights
                 current_hierarchical_params = proposed_hierarchical_params
+                log_current_posterior = log_proposed_posterior  # OTTIMIZZAZIONE: riusa il calcolo
                 acceptance_count += 1  # AGGIUNGI QUESTO
 
             # Saves samples after burn-in and thinning
             # the first burn_in samples are discarded, because they are too random and doesn't represent the posterior distribution, 
             # then every 'thin' samples are kept, in order to keep the samples more independent
-            if iteration >= burn_in and iteration % thin == 0:  
+            if iteration >= burn_in and iteration % thin == 0:
+                # OTTIMIZZAZIONE: Converti a numpy solo quando salviamo
                 samples.append({
                     'weights': {
-                        'beta': current_weights['beta'].copy(),
-                        'gamma': current_weights['gamma'].copy()
+                        'beta': current_weights['beta'].numpy().copy(),
+                        'gamma': current_weights['gamma'].numpy().copy()
                     },
-                    'hierarchical_params': current_hierarchical_params.copy()
+                    'hierarchical_params': {k: (v.numpy() if isinstance(v, tf.Tensor) else v) 
+                                           for k, v in current_hierarchical_params.items()}
                 })
             
             if iteration % 500 == 0:
                 acceptance_rate = acceptance_count / total_proposals if total_proposals > 0 else 0
                 print(f"Iterazione {iteration}, Acceptance rate: {acceptance_rate:.3f}")
                 print(f"Log posterior: {log_current_posterior:.2f}")
-                print(f"Log proposed: {log_proposed_posterior:.2f}")  # AGGIUNGI QUESTO
+                print(f"Log proposed: {log_proposed_posterior:.2f}")
 
         
         self.mcmc_samples = samples
@@ -525,25 +573,31 @@ class GNN:
         return samples
     
     def predict_with_uncertainty(self, environmental_data, t, N_0):
-        """
-        Prediction with uncertainty estimation using the MCMC samples.
+        """Prediction with uncertainty estimation using the MCMC samples
         """
         if not self.is_trained:
             raise ValueError("Model not trained. Call fit() before predict().")
         
         predictions = []
         
+        env_tf = tf.constant(environmental_data, dtype=tf.float32)
+        t_tf = tf.constant(t, dtype=tf.float32)
+        N_0_tf = tf.constant(N_0, dtype=tf.float32)
+        
         for sample in self.mcmc_samples:
-            # Prediction using the current weights
-            D, mu, lambda_p = self.forward_pass(environmental_data, sample['weights'])
+            weights_tf = {
+                'beta': tf.constant(sample['weights']['beta'], dtype=tf.float32),
+                'gamma': tf.constant(sample['weights']['gamma'], dtype=tf.float32)
+            }
+            D, mu, lambda_p = self.forward_pass(env_tf, weights_tf)
             
             # Gompertz prediction
-            gompertz_pred = self.gompertz_function(t, N_0, D, mu, lambda_p)
+            gompertz_pred = self.gompertz_function(t_tf, N_0_tf, D, mu, lambda_p)
             predictions.append({
-                'gompertz_prediction': gompertz_pred,
-                'D': D,
-                'mu': mu, 
-                'lambda': lambda_p
+                'gompertz_prediction': gompertz_pred.numpy(),
+                'D': D.numpy(),
+                'mu': mu.numpy(), 
+                'lambda': lambda_p.numpy()
             })
         
         # Statistics on predictions: mean, std, quantiles
@@ -769,17 +823,6 @@ def test_train(test_data, model):
     print(f"Errors < 5%: {sum(e < 5 for e in errors)}/{len(errors)}")
     print(f"Errors < 10%: {sum(e < 10 for e in errors)}/{len(errors)}")
 
-
-    print("\n\n\n\n")
-    print("\n=== WORST PREDICTIONS ===")
-    worst_errors = sorted(enumerate(predictions_list), key=lambda x: x[1]['error'], reverse=True)[:7]
-    for idx, pred in worst_errors:
-        test = test_data[idx]
-        print(f"\nTest {idx+1} (error: {pred['error']:.1f}%):")
-        print(f"  Env: PH={test['environmental'][0]*4+3:.1f}, Temperature={test['environmental'][1]*3+22:.1f}, Frequency={test['environmental'][2]*40:.1f}")
-        print(f"  Time: {test['time']:.1f}, N0: {test['initial_pop']:.2f}")
-        print(f"  Predicted: {pred['predicted']:.2f}, Observed: {pred['observed']:.2f}")
-
     mse = np.mean([e**2 for e in absolute_errors])
     return mse
 
@@ -880,6 +923,17 @@ def require_api_key(f):
 
     return decorated_function
 
+def convert_to_json_serializable(obj):
+    """Converte ricorsivamente numpy types in tipi Python nativi"""
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, (np.integer, np.floating)):
+        return obj.item()
+    elif isinstance(obj, dict):
+        return {key: convert_to_json_serializable(value) for key, value in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [convert_to_json_serializable(item) for item in obj]
+    return obj
 
 @app.route('/predict', methods=['POST'])
 @require_api_key
@@ -900,6 +954,7 @@ def predict():
         env_data.append(normalize(temperature,18,28))
         env_data.append(normalize(frequency,0,40))
 
+
         pred_result = model.predict(env_data, time, initial_conc)
         
         if not pred_result['success']:
@@ -908,8 +963,8 @@ def predict():
                 'message': pred_result['message']
             }), 400
 
-        result = pred_result['result']
-        result['gompertz']['quantiles'] = result['gompertz']['quantiles'].tolist()
+        print(pred_result, file=sys.stderr, flush=True)
+        result = convert_to_json_serializable(pred_result['result'])
         
         return jsonify({
             'status': 'success',
@@ -939,7 +994,7 @@ def train():
             new_test_data = divide_train_test_result['test']
 
             mcmc_params = {
-                'num_samples': 300000,
+                'num_samples': 200000,
                 'burn_in': 100000,
                 'thin': 1000
             }
@@ -1057,7 +1112,7 @@ if __name__ == '__main__':
         print("Training a new model")
         
         mcmc_params = {
-            'num_samples': 300000,
+            'num_samples': 200000,
             'burn_in': 100000,
             'thin': 1000
         }

@@ -147,7 +147,7 @@ const DeviceStatusLogPage = () => {
     const frequencyChartData = {
         datasets: [
             {
-                label: 'Frequency (Hz)',
+                label: 'Frequency (kHz)',
                 data: allLogs.map(log => ({
                     x: log.statusDate ? new Date(log.statusDate) : null,
                     y: log.frequency?.valueOf() ?? null
@@ -217,10 +217,10 @@ const DeviceStatusLogPage = () => {
                 }
             },
             y: {
-                beginAtZero: true,  // ← Questo forza il grafico a partire da 0
+                beginAtZero: true,
                 title: {
                     display: true,
-                    text: 'Frequency (Hz)'
+                    text: 'Frequency (kHz)'
                 }
             }
         },

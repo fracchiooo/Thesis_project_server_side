@@ -213,7 +213,7 @@ const PredictionCard: React.FC<PredictionCardProps> = ({
                     <FaBroadcastTower className="info-icon" />
                     <span className="info-label">Frequency:</span>
                     <span className="info-value">
-                        {formatNumber(prediction.frequency)} Hz
+                        {formatNumber(prediction.frequency)} kHz
                     </span>
                 </div>
                 <div className="prediction-info-item">

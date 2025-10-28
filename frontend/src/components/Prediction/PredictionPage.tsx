@@ -74,7 +74,7 @@ const PredictionPage = () => {
         const timeLasted = parseFloat(newPrediction.timeLasted);
 
         if (isNaN(frequency) || frequency < 0 || frequency > 40) {
-            errors.push('Frequency must be between 0 and 40 Hz');
+            errors.push('Frequency must be between 0 and 40 kHz');
         }
 
         if (isNaN(dutyCycle) || dutyCycle < 0 || dutyCycle > 100) {
@@ -357,7 +357,7 @@ const PredictionPage = () => {
 
                         <div className="form-group">
                             <label>
-                                Frequency (Hz):
+                                Frequency (kHz):
                                 <span className="range-hint">(0 - 40)</span>
                             </label>
                             <input
@@ -367,7 +367,7 @@ const PredictionPage = () => {
                                 max="40"
                                 value={newPrediction.frequency}
                                 onChange={(e) => handleInputChange('frequency', e.target.value)}
-                                placeholder="Enter frequency (0-40 Hz)"
+                                placeholder="Enter frequency (0-40 kHz)"
                             />
                         </div>
 
