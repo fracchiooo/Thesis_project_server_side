@@ -50,34 +50,32 @@ public class MqttConfig {
 
     @Bean
     public MqttClient mqttClient() throws MqttException {
-        // Usa ssl:// se TLS è abilitato, altrimenti tcp://
+        // Uses ssl:// if TLS enabled (it is by default), otherwise tcp://
         String protocol = tlsEnabled ? "ssl" : "tcp";
         String brokerUrl = String.format("%s://%s:%d", protocol, broker, port);
         
-        log.info("Connessione a MQTT broker: {}", brokerUrl);
+        log.info("Connecting to a MQTT broker: {}", brokerUrl);
         
         client = new MqttClient(brokerUrl, clientId);
         MqttConnectOptions options = new MqttConnectOptions();
         
-        // Configurazione base
         options.setCleanSession(false);
         options.setAutomaticReconnect(true);
         options.setConnectionTimeout(30);
         options.setKeepAliveInterval(60);
         options.setMaxReconnectDelay(5000);
 
-        // Autenticazione username/password
+        // Username and password auth
         if (username != null && !username.isEmpty()) {
             options.setUserName(username);
             log.info("Username configurato: {}", username);
         }
-        
         if (password != null && !password.isEmpty()) {
             options.setPassword(password.toCharArray());
             log.info("Password configurata");
         }
         
-        // Configurazione TLS
+        // TLS configuration
         if (tlsEnabled) {
             try {
                 SSLSocketFactory socketFactory = getSSLSocketFactory();
@@ -101,17 +99,17 @@ public class MqttConfig {
         while (attempt < maxAttempts) {
             try {
                 attempt++;
-                log.info("Tentativo di connessione {}/{}", attempt, maxAttempts);
+                log.info("Connection attempt {}/{}", attempt, maxAttempts);
                 client.connect(options);
-                log.info("✓ Connesso con successo al broker MQTT");
+                log.info("Successfully connected to a broker MQTT");
                 return;
             } catch (MqttException e) {
                 lastException = e;
-                log.warn("Tentativo {} fallito: {}", attempt, e.getMessage());
+                log.warn("Attempt {} failed: {}", attempt, e.getMessage());
                 
                 if (attempt < maxAttempts) {
                     try {
-                        Thread.sleep(2000 * attempt); // Backoff esponenziale
+                        Thread.sleep(2000 * attempt); // Exponential backoff
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         throw new MqttException(ie);
@@ -123,19 +121,17 @@ public class MqttConfig {
     }
     
     /**
-     * Crea SSLSocketFactory dal certificato CA
+     * Creates SSLSocketFactory from the broker certificate CA
      */
     private SSLSocketFactory getSSLSocketFactory() throws Exception {
-        // Se non è specificato un certificato, usa il default Java (funziona con Let's Encrypt, ecc.)
         if (caCertResource == null) {
-            log.info("Nessun certificato CA specificato, uso certificati di sistema");
+            log.info("No certificate CA specified, using system's ones");
             SSLContext sslContext = SSLContext.getInstance("TLS");
             sslContext.init(null, null, null);
             return sslContext.getSocketFactory();
         }
         
-        // Carica il certificato CA personalizzato
-        log.info("Caricamento certificato CA da: {}", caCertResource.getDescription());
+        log.info("Loaded certificate CA from: {}", caCertResource.getDescription());
         
         CertificateFactory cf = CertificateFactory.getInstance("X.509");
         X509Certificate caCert;
@@ -144,22 +140,19 @@ public class MqttConfig {
             caCert = (X509Certificate) cf.generateCertificate(inputStream);
         }
         
-        // Crea KeyStore e aggiungi il certificato
         KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
         keyStore.load(null, null);
         keyStore.setCertificateEntry("ca-certificate", caCert);
         
-        // Crea TrustManager con il KeyStore
         TrustManagerFactory tmf = TrustManagerFactory.getInstance(
             TrustManagerFactory.getDefaultAlgorithm()
         );
         tmf.init(keyStore);
         
-        // Crea SSLContext
         SSLContext sslContext = SSLContext.getInstance("TLS");
         sslContext.init(null, tmf.getTrustManagers(), null);
         
-        log.info("Certificato CA caricato con successo");
+        log.info("Certificate CA successfully loaded");
         return sslContext.getSocketFactory();
     }
 
@@ -168,13 +161,13 @@ public class MqttConfig {
     public void shutdown() {
         try {
             if (client != null && client.isConnected()) {
-                log.info("Disconnessione dal broker MQTT...");
+                log.info("Disconnecting from broker MQTT...");
                 client.disconnect(5000);
             }
             if (client != null) {
                 client.close();
             }
-            log.info("Client MQTT chiuso correttamente");
+            log.info("Client MQTT correctly closed");
         } catch (MqttException e) {
             log.error("Error disconnecting MQTT client", e);
         }

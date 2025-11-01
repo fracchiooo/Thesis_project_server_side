@@ -14,5 +14,4 @@ public class ModelResponseDto {
     Object received;
 
     Object result;
-    
 }

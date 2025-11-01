@@ -18,5 +18,4 @@ public class DeviceEnvMessageDto {
     private Float finishAfter;
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
     private Date startTime;
-    
 }

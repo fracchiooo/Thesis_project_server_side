@@ -22,9 +22,8 @@ public class MqttPublisher {
     }
     
     public void publish(String topic, String payload, int qos, boolean retained) throws MqttException {
-        // NON chiamare reconnect() manualmente - lascia gestire alla riconnessione automatica
         if (!mqttClient.isConnected()) {
-            log.warn("MQTT client non connesso, messaggio non inviato. Riconnessione automatica in corso...");
+            log.warn("MQTT client disconnected, message not send. Automatic reconnection...");
             throw new MqttException(MqttException.REASON_CODE_CLIENT_NOT_CONNECTED);
         }
         
@@ -33,11 +32,10 @@ public class MqttPublisher {
         message.setRetained(retained);
         
         mqttClient.publish(topic, message);
-        log.info("✓ Messaggio pubblicato su topic '{}' (QoS {}): {}", topic, qos, 
+        log.info("Published message on topic '{}' (QoS {}): {}", topic, qos, 
                  payload.length() > 100 ? payload.substring(0, 100) + "..." : payload);
     }
     
-    // Metodo alternativo con retry
     public void publishWithRetry(String topic, String payload, int qos, boolean retained, int maxRetries) {
         int attempt = 0;
         
@@ -47,7 +45,7 @@ public class MqttPublisher {
                 return;
             } catch (MqttException e) {
                 attempt++;
-                log.warn("Tentativo di pubblicazione {}/{} fallito: {}", attempt, maxRetries, e.getMessage());
+                log.warn("Pubblication attempt {}/{} failed: {}", attempt, maxRetries, e.getMessage());
                 
                 if (attempt < maxRetries) {
                     try {
@@ -59,8 +57,6 @@ public class MqttPublisher {
                 }
             }
         }
-        
-        log.error("✗ Impossibile pubblicare il messaggio dopo {} tentativi", maxRetries);
-    }
-     
+        log.error("Impossible to publish the message after {} attempts, stopped to try", maxRetries);
+    }    
 }

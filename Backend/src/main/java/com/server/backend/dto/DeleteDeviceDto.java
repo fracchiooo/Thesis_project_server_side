@@ -12,5 +12,4 @@ public class DeleteDeviceDto {
 
     @Nonnull
     String devEUI;
-    
 }

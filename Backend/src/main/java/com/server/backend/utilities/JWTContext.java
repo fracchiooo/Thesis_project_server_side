@@ -15,5 +15,4 @@ public class JWTContext {
     public static void clear() {
         jwtContext.remove();
     }
-    
 }

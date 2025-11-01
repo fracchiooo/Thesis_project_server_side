@@ -23,5 +23,4 @@ public class StatusDto {
     private String username;
 
     private Map<String, Object> deviceEnvRequests;
-
 }

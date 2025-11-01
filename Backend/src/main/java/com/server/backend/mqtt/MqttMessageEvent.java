@@ -20,5 +20,4 @@ public class MqttMessageEvent extends ApplicationEvent{
     public String getPayload() {
         return payload;
     }
-    
 }

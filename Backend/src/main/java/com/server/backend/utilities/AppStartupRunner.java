@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 
 import com.server.backend.model.Device;
 import com.server.backend.mqtt.MqttSubscriber;
-import com.server.backend.service.deviceService;
+import com.server.backend.service.DeviceService;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -23,13 +23,12 @@ public class AppStartupRunner implements CommandLineRunner {
     private MqttSubscriber mqttSubscriber;
 
     @Autowired
-    private deviceService deviceService;
+    private DeviceService deviceService;
 
     @Override
     public void run(String... args) throws Exception {
         
-        log.info("✓ Applicazione avviata - Eseguo sottoscrizioni MQTT per i dispositivi esistenti...");
-
+        log.info("Server started - Executing MQTT subscriptions per the devices registered in the database...");
 
         List<String> allDeviceEUIs = Optional.ofNullable(deviceService.getAllDevices().getBody())
             .orElse(Collections.emptyList())
@@ -38,18 +37,17 @@ public class AppStartupRunner implements CommandLineRunner {
             .toList();
                 
         if (allDeviceEUIs == null || allDeviceEUIs.isEmpty()) {
-            log.info("Nessun dispositivo trovato per la sottoscrizione.");
+            log.info("No device found for the startup subscriptions.");
             return;
         }
         for (String devEUI : allDeviceEUIs) {
             try {
                 mqttSubscriber.subscribe(devEUI+"/uplink");
             } catch (MqttException e) {
-                log.error("Errore durante la sottoscrizione al topic del dispositivo {}: {}", devEUI, e.getMessage());
+                log.error("Error during the subscription of the topic for the device {}: {}", devEUI, e.getMessage());
             }
         }
         
-        log.info("✓ Sottoscrizioni iniziali completate.");
+        log.info("Startup subscriptions completed.");
     }
-    
 }

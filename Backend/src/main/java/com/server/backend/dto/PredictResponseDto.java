@@ -28,5 +28,4 @@ public class PredictResponseDto {
     private Float timeLasted;
 
     private Float temperature;
-    
 }

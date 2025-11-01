@@ -26,29 +26,28 @@ import com.server.backend.model.User;
 import com.server.backend.mqtt.MqttMessageEvent;
 import com.server.backend.mqtt.MqttPublisher;
 import com.server.backend.mqtt.MqttSubscriber;
-import com.server.backend.repository.deviceRepository;
-import com.server.backend.repository.deviceStatusLogsRepository;
-import com.server.backend.repository.userRepository;
+import com.server.backend.repository.DeviceRepository;
+import com.server.backend.repository.DeviceStatusLogsRepository;
+import com.server.backend.repository.UserRepository;
 import com.server.backend.utilities.JWTContext;
 
 import jakarta.persistence.EntityManager;
 
 
 @Service
-public class deviceService {
+public class DeviceService {
 
-    
     @Autowired
     private ObjectMapper objectMapper;
 
     @Autowired
-    private deviceRepository deviceRepo;
+    private DeviceRepository deviceRepo;
 
     @Autowired
-    private userRepository userRepo;
+    private UserRepository userRepo;
 
     @Autowired
-    private deviceStatusLogsRepository devLogsRepo;
+    private DeviceStatusLogsRepository devLogsRepo;
 
     @Autowired
     private MqttSubscriber mqttSubscriber;
@@ -60,7 +59,6 @@ public class deviceService {
     private EntityManager entityManager;
 
 
-  
     public ResponseEntity<List<Device>> getAllDevicesOfUser() {
         List<Device> devices = deviceRepo.findByUserUsername(JWTContext.get());
         return ResponseEntity.ok(devices);
@@ -179,7 +177,6 @@ public class deviceService {
         Device device = devOpt.get();
         System.out.println(payload);
         try {
-            // Assuming payload is a JSON string with fields matching Device's fields
             MessageUplinkDto message = objectMapper.readValue(payload, MessageUplinkDto.class);
             device.setLastUpdate(message.getLastUpdate());
             device.setCurrentTemperature(message.getCurrentTemperature());
@@ -192,8 +189,7 @@ public class deviceService {
             deviceRepo.save(device);
             deviceRepo.flush();
 
-            //saves the last 777700 entries for each device, then each new update log replaces the oldest one
-            // if we have an update every 10 seconds, I'm able to display the last 90 days of updates
+
             DeviceStatusLogs devLog = new DeviceStatusLogs();
             devLog.setDevice(device);
             devLog.setStatusDate(message.getLastUpdate());
@@ -206,14 +202,12 @@ public class deviceService {
             entityManager.flush();
 
             System.out.println("Updated device status for: " + topic);
-            //get the data from dto and update the device status
         } catch (Exception e) {
-            System.out.println("❌ Parsing failed: "+e.getMessage());
+            System.out.println("Parsing failed: "+e.getMessage());
             System.out.println("Payload was: "+ payload);
             System.out.println("Error parsing JSON payload for device: " + topic);
         }
     }
-
 
     public ResponseEntity<List<DeviceStatusLogs>> getStatussesDevice(String deviceEUI){
         if (!deviceRepo.existsById(deviceEUI)) {

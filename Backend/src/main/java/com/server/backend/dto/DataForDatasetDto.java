@@ -29,6 +29,5 @@ public class DataForDatasetDto {
     private Float temperature;
 
     @Nonnull
-    private Float observedConcentration;
-    
+    private Float observedConcentration;  
 }

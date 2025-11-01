@@ -19,13 +19,13 @@ import com.server.backend.dto.LoginDto;
 import com.server.backend.dto.UserProfileRequestDto;
 import com.server.backend.dto.UserProfileResponseDto;
 import com.server.backend.model.User;
-import com.server.backend.repository.userRepository;
+import com.server.backend.repository.UserRepository;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 
 @Service
-public class userService {
+public class UserService {
 
     @Value("${authentication.service.jwtSecret}")
     private String secretKey;
@@ -37,7 +37,7 @@ public class userService {
     private ObjectMapper objectMapper;
 
     @Autowired
-    private userRepository userRepo;
+    private UserRepository userRepo;
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
@@ -76,8 +76,6 @@ public class userService {
         return new ResponseEntity<>(jwt, HttpStatus.OK);
     }
 
-
-
     private String generateToken(String username) {
         return Jwts.builder()
                 .setSubject(username)
@@ -88,7 +86,6 @@ public class userService {
     }
 
     private SecretKey generateKey() {
-        System.out.println(secretKey);
         return Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
     }
 
@@ -114,6 +111,4 @@ public class userService {
             return null;
         }
     }
-
-    
 }

@@ -15,6 +15,5 @@ public class UserProfileRequestDto {
     private String password;
     
     @Nonnull
-    private String username;
-    
+    private String username; 
 }

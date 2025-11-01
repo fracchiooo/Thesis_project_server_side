@@ -11,7 +11,7 @@ import org.springframework.stereotype.Repository;
 import com.server.backend.model.DeviceStatusLogs;
 
 @Repository
-public interface deviceStatusLogsRepository extends JpaRepository<DeviceStatusLogs, Long> {
+public interface DeviceStatusLogsRepository extends JpaRepository<DeviceStatusLogs, Long> {
 
     List<DeviceStatusLogs> findByDeviceDeviceEUI(String deviceEUI);
 
@@ -21,6 +21,4 @@ public interface deviceStatusLogsRepository extends JpaRepository<DeviceStatusLo
         Date endDate, 
         Pageable pageable
     );
-    
-    
 }

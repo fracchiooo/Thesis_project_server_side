@@ -24,5 +24,4 @@ public class PredictionDto {
 
     @Nonnull
     private Float temperature;
-    
 }

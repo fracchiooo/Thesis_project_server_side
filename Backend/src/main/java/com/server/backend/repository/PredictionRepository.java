@@ -6,6 +6,5 @@ import org.springframework.stereotype.Repository;
 import com.server.backend.model.Prediction;
 
 @Repository
-public interface predictionRepository extends JpaRepository<Prediction, Long> {
-    
+public interface PredictionRepository extends JpaRepository<Prediction, Long> {
 }

@@ -33,6 +33,4 @@ public class User {
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.DETACH, fetch = FetchType.LAZY)
     private List<Prediction> predictions;
-
-
 }

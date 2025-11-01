@@ -22,17 +22,15 @@ import com.server.backend.dto.DeleteDeviceDto;
 import com.server.backend.dto.StatusDto;
 import com.server.backend.model.Device;
 import com.server.backend.model.DeviceStatusLogs;
-import com.server.backend.service.deviceService;
-
-
+import com.server.backend.service.DeviceService;
 
 
 @RestController
 @RequestMapping("/device")
-public class deviceController {
+public class DeviceController {
 
     @Autowired
-    private deviceService deviceServ;
+    private DeviceService deviceServ;
 
 
     @PostMapping("/create")

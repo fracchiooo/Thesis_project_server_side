@@ -16,18 +16,15 @@ import com.server.backend.dto.CompletePredictionDto;
 import com.server.backend.dto.DataForDatasetDto;
 import com.server.backend.dto.PredictionDto;
 import com.server.backend.model.Prediction;
-import com.server.backend.service.predictionService;
-
-
-
+import com.server.backend.service.PredictionService;
 
 
 @RestController
 @RequestMapping("/prediction")
-public class predictionController {
+public class PredictionController {
 
     @Autowired
-    private predictionService predictionServ;
+    private PredictionService predictionServ;
 
     @PostMapping("/predict")
     public ResponseEntity<Prediction> predict(@RequestBody PredictionDto predDto) {
@@ -57,8 +54,4 @@ public class predictionController {
     public ResponseEntity<Object> addData(@RequestBody DataForDatasetDto dataDto) {
         return predictionServ.addData(dataDto);
     }
-    
-    
-    
-    
 }

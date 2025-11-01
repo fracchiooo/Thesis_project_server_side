@@ -11,15 +11,14 @@ import org.springframework.web.bind.annotation.RestController;
 import com.server.backend.dto.LoginDto;
 import com.server.backend.dto.UserProfileRequestDto;
 import com.server.backend.dto.UserProfileResponseDto;
-import com.server.backend.service.userService;
+import com.server.backend.service.UserService;
 
 @RestController
 @RequestMapping("/user")
-public class userController {
+public class UserController {
 
     @Autowired
-    private userService userServ;
-
+    private UserService userServ;
 
     @PostMapping("/create")
     public ResponseEntity<Object> createUser(@RequestBody UserProfileRequestDto userProfileRequestDto) {
@@ -34,7 +33,5 @@ public class userController {
     @PostMapping("/login")
     public ResponseEntity<Object> login(@RequestBody LoginDto loginDto) {
          return userServ.login(loginDto);
-    }
-
-    
+    } 
 }

@@ -9,11 +9,9 @@ import org.springframework.stereotype.Repository;
 import com.server.backend.model.Device;
 
 @Repository
-public interface deviceRepository extends JpaRepository<Device, String> {
+public interface DeviceRepository extends JpaRepository<Device, String> {
 
     List<Device> findByUserUsername(String username);
     
     Optional<Device> findByDeviceEUIAndUserUsername(String deviceEUI, String username);
-
-    
 }

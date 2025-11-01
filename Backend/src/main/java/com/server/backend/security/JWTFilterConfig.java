@@ -14,5 +14,4 @@ public class JWTFilterConfig {
         registrationBean.addUrlPatterns("/*");
         return registrationBean;
     }
-    
 }

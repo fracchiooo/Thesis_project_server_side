@@ -12,5 +12,4 @@ public class CompletePredictionDto {
 
     @Nonnull
     Float observed_density;
-    
 }

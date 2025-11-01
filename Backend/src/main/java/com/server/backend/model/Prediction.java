@@ -63,13 +63,9 @@ public class Prediction {
     @JoinColumn(name = "user_id", referencedColumnName = "username")
     private User user;
 
-
     public void setEnvironmentalConditions(float frequency, Float dutyCycle, Float temperature) {
         this.frequency = frequency;
         this.dutyCycle = dutyCycle;
         this.temperature = temperature;
-    }
-
-
-    
+    }    
 }

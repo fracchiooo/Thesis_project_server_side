@@ -5,7 +5,7 @@ import java.io.IOException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import com.server.backend.service.userService;
+import com.server.backend.service.UserService;
 import com.server.backend.utilities.JWTContext;
 
 import jakarta.servlet.Filter;
@@ -22,7 +22,7 @@ import jakarta.servlet.http.HttpServletResponse;
 public class JWTAuthenticationFilter implements Filter{
 
     @Autowired
-    userService userServ;
+    UserService userServ;
     
 
     @Override
@@ -52,12 +52,10 @@ public class JWTAuthenticationFilter implements Filter{
         }
 
         if (token.startsWith("Bearer ")) {
-            token = token.substring(7); // rimuove "Bearer "
+            token = token.substring(7); // removes "Bearer "
         }
-        System.out.println("the token of the user to be validated is "+token);
 
         boolean result = userServ.validateToken(token);
-        System.out.println("the result of the validation is: "+result);
 
         if(result){
             // Token is valid, proceed with the request

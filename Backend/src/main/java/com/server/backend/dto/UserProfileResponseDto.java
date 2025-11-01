@@ -16,6 +16,5 @@ public class UserProfileResponseDto {
 
     private String username;
     private List<Device> devices;
-    private List<Prediction> predictions;
-    
+    private List<Prediction> predictions;  
 }

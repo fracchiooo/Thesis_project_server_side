@@ -28,7 +28,6 @@ public class DeviceStatusLogs {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "device_id", referencedColumnName = "device_eui")
@@ -42,5 +41,4 @@ public class DeviceStatusLogs {
 
     @Column(name = "frequency")
     private Float frequency;
-    
 }

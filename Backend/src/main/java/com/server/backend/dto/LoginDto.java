@@ -15,5 +15,4 @@ public class LoginDto {
 
     @Nonnull
     private String password;
-    
 }

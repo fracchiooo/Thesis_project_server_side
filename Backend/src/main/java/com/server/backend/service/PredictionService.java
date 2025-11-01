@@ -19,18 +19,18 @@ import com.server.backend.dto.DataForDatasetDto;
 import com.server.backend.dto.ModelResponseDto;
 import com.server.backend.dto.PredictionDto;
 import com.server.backend.model.Prediction;
-import com.server.backend.repository.predictionRepository;
-import com.server.backend.repository.userRepository;
+import com.server.backend.repository.PredictionRepository;
+import com.server.backend.repository.UserRepository;
 import com.server.backend.utilities.JWTContext;
 
 @Service
-public class predictionService {
+public class PredictionService {
 
     @Autowired
-    private predictionRepository predictionRepo;
+    private PredictionRepository predictionRepo;
 
     @Autowired
-    private userRepository userRepo;
+    private UserRepository userRepo;
     
     @Autowired
     private RestTemplate restTemplate;
@@ -46,8 +46,6 @@ public class predictionService {
 
 
     public ResponseEntity<Prediction> predict(PredictionDto predDto) {
-        // TODO make call to the model microservice
-        // TODO save the prediction in the database (without observed data)
         
         HttpHeaders headers = new HttpHeaders();
         headers.set("Content-Type", "application/json");
@@ -81,17 +79,6 @@ public class predictionService {
                 p = predictionRepo.save(p);
                 predictionRepo.flush();
 
-                /*PredictResponseDto responseDto = new PredictResponseDto();
-                responseDto.setId(p.getId());
-                responseDto.setTimestamp(p.getTimestamp());
-                responseDto.setPredictedConcentration(p.getPredictedConcentration());
-                responseDto.setPredictedUncertainty(p.getPredictedUncertainty());
-                responseDto.setInitialConcentration(p.getInitialConcentration());
-                responseDto.setFrequency(p.getFrequency());
-                responseDto.setDutyCycle(p.getDutyCycle());
-                responseDto.setTimeLasted(p.getTimeLasted());
-                responseDto.setTemperature(p.getTemperature());*/
-
                 return ResponseEntity.ok(p);
             } else {
                 return ResponseEntity.status(500).body(null);
@@ -100,8 +87,6 @@ public class predictionService {
             return ResponseEntity.status(res.getStatusCode()).body(null);
         }
     }
-
-
 
     public ResponseEntity<Object> completePrediction(Long id, CompletePredictionDto observed) {
         Prediction p = predictionRepo.findById(id).orElse(null);
@@ -149,7 +134,6 @@ public class predictionService {
         }
     }
 
-
     public ResponseEntity<Object> addData(DataForDatasetDto dataDto) {
         Optional<Prediction> p = predictionRepo.findById(dataDto.getId());
         if(p.isEmpty()){
@@ -181,8 +165,5 @@ public class predictionService {
         } else {
             return ResponseEntity.status(res.getStatusCode()).body(res.getBody() != null && res.getBody().getResult() != null ? res.getBody().getResult() : "Error during adding data");
         }
-    }
-
-
-    
+    }    
 }

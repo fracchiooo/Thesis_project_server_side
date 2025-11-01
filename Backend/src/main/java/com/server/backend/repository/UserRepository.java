@@ -8,7 +8,7 @@ import org.springframework.stereotype.Repository;
 import com.server.backend.model.User;
 
 @Repository
-public interface userRepository extends JpaRepository<User, String> {
+public interface UserRepository extends JpaRepository<User, String> {
     
     Optional<User> findByUsernameAndHashPassword(String username, String hash_pass);
 

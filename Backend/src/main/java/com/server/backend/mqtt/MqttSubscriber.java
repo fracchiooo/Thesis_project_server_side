@@ -31,7 +31,7 @@ public class MqttSubscriber implements MqttCallback {
     @PostConstruct
     private void initialize() {
         mqttClient.setCallback(this);
-        log.info("MqttSubscriber inizializzato e pronto per sottoscrizioni");
+        log.info("MqttSubscriber initialized");
     }
     
     public void subscribe(String topic) throws MqttException {
@@ -40,13 +40,13 @@ public class MqttSubscriber implements MqttCallback {
     
     public synchronized void subscribe(String topic, int qos) throws MqttException {
         if (activeSubscriptions.containsKey(topic)) {
-            log.warn("Già sottoscritto al topic '{}', aggiornamento QoS da {} a {}", 
+            log.warn("Already subscribed to the topic '{}', updated QoS from {} to {}", 
                      topic, activeSubscriptions.get(topic), qos);
         }
         
         mqttClient.subscribe(topic, qos);
         activeSubscriptions.put(topic, qos);
-        log.info("✓ Sottoscritto al topic '{}' con QoS {}", topic, qos);
+        log.info("Subscribed to topic '{}' with QoS {}", topic, qos);
     }
     
     public synchronized void subscribeMultiple(Map<String, Integer> topicsWithQos) throws MqttException {
@@ -56,7 +56,7 @@ public class MqttSubscriber implements MqttCallback {
         mqttClient.subscribe(topics, qosLevels);
         activeSubscriptions.putAll(topicsWithQos);
         
-        log.info("✓ Sottoscritto a {} topic: {}", topics.length, String.join(", ", topics));
+        log.info("Subscribed to {} topic: {}", topics.length, String.join(", ", topics));
     }
     
     public synchronized void subscribeMultiple(String[] topics, int qos) throws MqttException {
@@ -71,19 +71,19 @@ public class MqttSubscriber implements MqttCallback {
             activeSubscriptions.put(topic, qos);
         }
         
-        log.info("✓ Sottoscritto a {} topic con QoS {}: {}", 
+        log.info("Subscribed to {} topic with QoS {}: {}", 
                  topics.length, qos, String.join(", ", topics));
     }
     
     public synchronized void unsubscribe(String topic) throws MqttException {
         if (!activeSubscriptions.containsKey(topic)) {
-            log.warn("Tentativo di disiscrizione da topic '{}' non sottoscritto", topic);
+            log.warn("Attempt to unsubscribe to a topic '{}' alredy unsubscribed", topic);
             return;
         }
         
         mqttClient.unsubscribe(topic);
         activeSubscriptions.remove(topic);
-        log.info("✗ Disiscritto dal topic '{}'", topic);
+        log.info("Unsubscribed to the topic '{}'", topic);
     }
     
     public synchronized void unsubscribeMultiple(String[] topics) throws MqttException {
@@ -93,12 +93,12 @@ public class MqttSubscriber implements MqttCallback {
             activeSubscriptions.remove(topic);
         }
         
-        log.info("✗ Disiscritto da {} topic: {}", topics.length, String.join(", ", topics));
+        log.info("Unsubscribed from {} topic: {}", topics.length, String.join(", ", topics));
     }
     
     public synchronized void unsubscribeAll() throws MqttException {
         if (activeSubscriptions.isEmpty()) {
-            log.info("Nessuna sottoscrizione attiva da rimuovere");
+            log.info("No active subscription removable");
             return;
         }
         
@@ -107,7 +107,7 @@ public class MqttSubscriber implements MqttCallback {
         
         int count = activeSubscriptions.size();
         activeSubscriptions.clear();
-        log.info("✗ Disiscritto da tutti i {} topic attivi", count);
+        log.info("Unsubscribed from all the {} active topics", count);
     }
     
     public Map<String, Integer> getActiveSubscriptions() {
@@ -118,98 +118,81 @@ public class MqttSubscriber implements MqttCallback {
         return activeSubscriptions.containsKey(topic);
     }
     
-    /**
-     * CORRETTO: Ripristina sottoscrizioni IMMEDIATAMENTE dopo riconnessione
-     */
+
     private synchronized void reconnectAndResubscribe() {
         if (activeSubscriptions.isEmpty()) {
-            log.info("Nessuna sottoscrizione da ripristinare");
+            log.info("No subscription to restore");
             return;
         }
         
         try {
-            log.info("⚡ Ripristino IMMEDIATO di {} sottoscrizioni...", activeSubscriptions.size());
+            log.info("Restore of {} subscriptions...", activeSubscriptions.size());
             
             String[] topics = activeSubscriptions.keySet().toArray(new String[0]);
             int[] qosLevels = activeSubscriptions.values().stream()
                                                   .mapToInt(Integer::intValue)
                                                   .toArray();
             
-            // CRITICO: Sottoscrivi IMMEDIATAMENTE
             mqttClient.subscribe(topics, qosLevels);
             
-            log.info("✓ {} sottoscrizioni ripristinate: {}", 
+            log.info("{} restored subscriptions: {}", 
                      topics.length, String.join(", ", topics));
             
         } catch (MqttException e) {
-            log.error("❌ ERRORE critico durante ripristino sottoscrizioni: {}", e.getMessage(), e);
+            log.error("Error during subscription's restore: {}", e.getMessage(), e);
             
             // Retry dopo breve attesa
             try {
                 Thread.sleep(500);
-                log.info("Secondo tentativo di ripristino sottoscrizioni...");
+                log.info("Second try on restoring the subscriptions...");
                 
                 String[] topics = activeSubscriptions.keySet().toArray(new String[0]);
                 int[] qosLevels = activeSubscriptions.values().stream()
                                                       .mapToInt(Integer::intValue)
                                                       .toArray();
                 mqttClient.subscribe(topics, qosLevels);
-                log.info("✓ Sottoscrizioni ripristinate al secondo tentativo");
+                log.info("Subscription restored");
                 
             } catch (Exception retryException) {
-                log.error("❌ Impossibile ripristinare sottoscrizioni dopo retry", retryException);
+                log.error("Definitely impossible to restore the subscriptions", retryException);
             }
         }
     }
     
-    // ========== Callback MqttCallback ==========
     
     @Override
     public void connectionLost(Throwable cause) {
-        log.error("⚠️ Connessione MQTT persa: {} - {}", 
+        log.error("MQTT connection lost: {} - {}", 
                  cause.getClass().getSimpleName(), 
                  cause.getMessage());
-        
-        if (cause instanceof java.io.EOFException) {
-            log.error("🔴 EOFException rilevata - probabilmente problema con sottoscrizioni o sessione");
-        }
-        
-        // La riconnessione automatica è gestita da Paho
-        // Quando si riconnette, chiamiamo reconnectAndResubscribe()
         scheduleResubscribe();
     }
     
-    /**
-     * Schedula il ripristino delle sottoscrizioni dopo la riconnessione
-     */
+   
     private void scheduleResubscribe() {
         new Thread(() -> {
             try {
-                // Attendi che la riconnessione sia completa
                 int attempts = 0;
-                int maxAttempts = 20; // 20 secondi max
+                int maxAttempts = 20; // 20 seconds max
                 
                 while (!mqttClient.isConnected() && attempts < maxAttempts) {
                     attempts++;
-                    log.debug("Attesa riconnessione... {}/{}", attempts, maxAttempts);
+                    log.debug("Waiting reconenction... {}/{}", attempts, maxAttempts);
                     Thread.sleep(1000);
                 }
                 
                 if (mqttClient.isConnected()) {
-                    log.info("✓ Client riconnesso, ripristino sottoscrizioni...");
+                    log.info("Client reconnected, restoring subscriptions...");
                     
-                    // CRITICO: Piccola pausa per stabilizzare la connessione
                     Thread.sleep(100);
-                    
-                    // Ripristina sottoscrizioni
                     reconnectAndResubscribe();
                 } else {
-                    log.error("❌ Timeout riconnessione dopo {} secondi", maxAttempts);
+                    log.error("Timeout reconnections after {} seconds", maxAttempts);
                 }
                 
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                log.error("Thread ripristino sottoscrizioni interrotto", e);
+                log.error("Thread for restoring subscriptions interrupted", e);
             }
         }, "MQTT-Resubscribe-Thread").start();
     }
@@ -218,13 +201,13 @@ public class MqttSubscriber implements MqttCallback {
     public void messageArrived(String topic, MqttMessage message) throws Exception {
         String payload = new String(message.getPayload());
         
-        log.info("📩 Messaggio - Topic: '{}', QoS: {}, Retained: {}, Size: {} bytes", 
+        log.info("MESSAGE - Topic: '{}', QoS: {}, Retained: {}, Size: {} bytes", 
                  topic, message.getQos(), message.isRetained(), payload.length());
         
         if (payload.length() <= 200) {
             log.debug("Payload: {}", payload);
         } else {
-            log.debug("Payload (troncato): {}...", payload.substring(0, 200));
+            log.debug("Payload (truncated, because too long to log): {}...", payload.substring(0, 200));
         }
         
         MqttMessageEvent event = new MqttMessageEvent(this, topic, payload);
