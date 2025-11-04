@@ -41,8 +41,8 @@ class GNN:
 
         if hyperparams is None:
             self.hyperparams = {
-                'd_beta1': 0.1, 'd_beta2': 0.01, 'c_beta': 10.0, 'e_beta': 10.0,
-                'd_gamma1': 0.01, 'd_gamma2': 0.01, 'c_gamma': 10.0, 'a': 0.2, 'b': 0.2,
+                'd_beta1': 6, 'd_beta2': 1, 'c_beta': 15, 'e_beta': 20.0,
+                'd_gamma1': 4, 'd_gamma2': 1, 'c_gamma': 20.0, 'a': 4, 'b': 1.5,
                 'm_0_beta_means': [2.0, 0.5, 12.0]  # [mean_D, mean_μ, mean_λ]
             }
         else:
