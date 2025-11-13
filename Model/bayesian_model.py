@@ -13,6 +13,8 @@ import threading
 import sys
 import logging
 
+from scipy.stats import norm, gamma as scipy_gamma
+
 tfd = tfp.distributions
 tfk = tf.keras
 tfkl = tf.keras.layers
@@ -41,9 +43,9 @@ class GNN:
 
         if hyperparams is None:
             self.hyperparams = {
-                'd_beta1': 6, 'd_beta2': 1, 'c_beta': 15, 'e_beta': 20.0,
-                'd_gamma1': 4, 'd_gamma2': 1, 'c_gamma': 20.0, 'a': 4, 'b': 1.5,
-                'm_0_beta_means': [2.0, 0.5, 12.0]  # [mean_D, mean_μ, mean_λ]
+                'd_beta1': 3, 'd_beta2': 3, 'c_beta': 15, 'e_beta': 20.0,
+                'd_gamma1': 2, 'd_gamma2': 5, 'c_gamma': 20.0, 'a': 4, 'b': 1.5,
+                'm_0_beta_means': [3.046, 0.297, 7.0]  # [mean_D, mean_μ, mean_λ]
             }
         else:
             self.hyperparams = hyperparams
@@ -281,9 +283,9 @@ class GNN:
         
         # Prior on γ weights
         gamma_flat = tf.reshape(gamma_weights, [-1])  # [HIDDEN_UNITS * 3]
-        # Ordine: [γ_00, γ_01, γ_02, γ_10, γ_11, γ_12, ...]
+        # Order: [γ_00, γ_01, γ_02, γ_10, γ_11, γ_12, ...]
         m_gamma_expanded = tf.tile(hierarchical_params['m_gamma'], [self.HIDDEN_UNITS])
-        # Ordine: [m_γ[0], m_γ[1], m_γ[2], m_γ[0], m_γ[1], m_γ[2], ...]
+        # Order: [m_γ[0], m_γ[1], m_γ[2], m_γ[0], m_γ[1], m_γ[2], ...]
         
         gamma_prior_dist = tfd.Normal(
             tf.cast(m_gamma_expanded, tf.float32),
@@ -445,7 +447,6 @@ class GNN:
             else:
                 log_acceptance_ratio = log_proposed_posterior - log_current_posterior
                 
-                # Evita overflow
                 if log_acceptance_ratio >= 0:
                     accept = True
                 else:
@@ -632,6 +633,7 @@ class Model:
                 self.gnn.is_trained = True
                 
                 self.mcmc_params = data['mcmc_params']
+
                 self.is_trained = True
                 
                 print(f"Model loaded from {filepath}")
@@ -686,6 +688,9 @@ def divide_train_test(all_data):
 
 
 def test_train(test_data, model):
+    if test_data is None or len(test_data) == 0:
+        logger.info("No test data provided.")
+        return 0.0
 
     errors = []
     absolute_errors = []
@@ -787,21 +792,20 @@ def append_row(filepath, data):
     data = [str(cell).strip() for cell in data]
     
     with open(filepath, 'a', newline='', encoding='utf-8') as f:
-        writer = csv.writer(f, delimiter=';')  # Virgola
+        writer = csv.writer(f, delimiter=';')
         writer.writerow(data)
 
 
 def append_csv_to_csv(source_file, target_file):
     with open(source_file, 'r', newline='', encoding='utf-8-sig') as source:
-        reader = csv.reader(source, delimiter=';')  # Virgola
+        reader = csv.reader(source, delimiter=';')
         
         with open(target_file, 'a', newline='', encoding='utf-8') as target:
-            writer = csv.writer(target, delimiter=';')  # Virgola
+            writer = csv.writer(target, delimiter=';')
             for row in reader:
                 row = [cell.strip() for cell in row]
                 writer.writerow(row)
 
-    # Svuota il file sorgente
     with open(source_file, 'w', newline='', encoding='utf-8') as source:
         pass
 
@@ -899,12 +903,14 @@ def train():
         try:
             all_data = load_dataset('/app/dataset_conf/dataset.csv')
 
-            divide_train_test_result = divide_train_test(all_data)
-            new_observed_data = divide_train_test_result['observed']
-            new_test_data = divide_train_test_result['test']
+            #divide_train_test_result = divide_train_test(all_data)
+            #new_observed_data = divide_train_test_result['observed']
+            #new_test_data = divide_train_test_result['test']
+            new_observed_data = all_data
+            new_test_data = []
 
             mcmc_params = {
-                'num_samples': 200000,
+                'num_samples': 300000,
                 'burn_in': 100000,
                 'thin': 1000
             }
@@ -991,6 +997,525 @@ def addData():
         }), 500
 
 
+def plot_optical_density_with_uncertainty(data1, data2=None, 
+                                          label1="Real growth curve", 
+                                          label2="Predicted growth curve", 
+                                          title="Optical density growth", 
+                                          xlabel="Time", 
+                                          ylabel="Optical Density",
+                                          filename="optical_density_with_uncertainty.png", 
+                                          save_path="/app/dataset_conf"):
+    """
+    Disegna il grafico della densità ottica con banda di confidenza.
+    
+    Parameters:
+    -----------
+    data1 : list of tuples
+        Lista di coppie (tempo, densità_ottica) per il primo dataset (dati reali)
+    data2 : list of tuples, optional
+        Lista di triple (tempo, densità_ottica, std_dev) per il secondo dataset (predizioni)
+        Se presente, disegna anche la banda di confidenza (mean ± 2*std)
+    label1 : str
+        Etichetta per il primo dataset
+    label2 : str
+        Etichetta per il secondo dataset
+    title : str
+        Titolo del grafico
+    xlabel : str
+        Etichetta asse x
+    ylabel : str
+        Etichetta asse y
+    filename : str
+        Nome del file da salvare
+    save_path : str
+        Percorso dove salvare il grafico
+    
+    Returns:
+    --------
+    str : Path completo del file salvato
+    """
+    
+    # Estrai dati del primo dataset (dati reali)
+    times1, od1 = zip(*data1)
+    
+    fig, ax = plt.subplots(figsize=(12, 7))
+    
+    # Plot dati reali
+    ax.plot(times1, od1, marker='o', linestyle='-', linewidth=2.5, 
+            label=label1, color='steelblue', markersize=8)
+    
+    # Se ci sono predizioni con incertezza
+    if data2 is not None:
+        # Controlla se data2 contiene triple (time, density, std) o coppie (time, density)
+        if len(data2[0]) == 3:
+            # Triple: (time, density, std_dev)
+            times2, od2, std_devs = zip(*data2)
+            times2 = np.array(times2)
+            od2 = np.array(od2)
+            std_devs = np.array(std_devs)
+            
+            # Plot predizioni (linea centrale)
+            ax.plot(times2, od2, marker='s', linestyle='-', linewidth=2.5, 
+                   label=label2, color='darkorange', markersize=6)
+            
+            # Banda di confidenza al 95% (≈ mean ± 2*std)
+            lower_bound = od2 - 2 * std_devs
+            upper_bound = od2 + 2 * std_devs
+            
+            ax.fill_between(times2, lower_bound, upper_bound, 
+                           alpha=0.3, color='darkorange', 
+                           label='95% Confidence interval')
+            
+            # Banda più stretta al 68% (≈ mean ± 1*std) - opzionale
+            lower_bound_1std = od2 - std_devs
+            upper_bound_1std = od2 + std_devs
+            
+            ax.fill_between(times2, lower_bound_1std, upper_bound_1std, 
+                           alpha=0.4, color='orange', 
+                           label='68% Confidence interval')
+            
+        else:
+            # Coppie: (time, density) - backward compatibility
+            times2, od2 = zip(*data2)
+            ax.plot(times2, od2, marker='s', linestyle='-', linewidth=2.5, 
+                   label=label2, color='darkorange', markersize=6)
+    
+    ax.set_xlabel(xlabel, fontsize=13, fontweight='bold')
+    ax.set_ylabel(ylabel, fontsize=13, fontweight='bold')
+    ax.set_title(title, fontsize=15, fontweight='bold')
+    
+    ax.legend(fontsize=11, loc='best')
+    ax.grid(True, alpha=0.3, linestyle='--')
+    
+    plt.tight_layout()
+    full_path = os.path.join(save_path, filename)
+    plt.savefig(full_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    print(f"Plot saved to: {full_path}")
+    
+    return full_path
+
+
+
+def plot_prior_with_final_values(model, save_path="/app/dataset_conf"):
+    """
+    Visualizza le distribuzioni prior con i valori finali (stima bayesiana).
+    
+    Per ogni parametro gerarchico:
+    - Disegna la distribuzione prior (la "campana" iniziale)
+    - Marca con un punto rosso la MEDIA dei campioni MCMC (stima bayesiana finale)
+    
+    La media rappresenta la stima bayesiana che integra su tutta l'incertezza posterior.
+    
+    Questo mostra: "Partivo da questa credenza (curva), la stima finale è qui (punto rosso)"
+    
+    Parameters:
+    -----------
+    model : Model
+        Il modello addestrato
+    save_path : str
+        Percorso dove salvare i grafici
+    
+    Returns:
+    --------
+    dict : Dizionario con i path dei file salvati
+    """
+    
+    if not model.is_trained:
+        raise ValueError("Il modello deve essere addestrato")
+    
+    samples = model.gnn.mcmc_samples
+    hyperparams = model.gnn.hyperparams
+    
+    # Calcola i valori finali (media dei campioni posterior - stima bayesiana)
+    m_0_beta_final = [
+        np.mean([s['hierarchical_params']['m_0_beta'][0] for s in samples]),
+        np.mean([s['hierarchical_params']['m_0_beta'][1] for s in samples]),
+        np.mean([s['hierarchical_params']['m_0_beta'][2] for s in samples])
+    ]
+    
+    m_i_beta_final = [
+        np.mean([s['hierarchical_params']['m_i_beta'][0] for s in samples]),
+        np.mean([s['hierarchical_params']['m_i_beta'][1] for s in samples]),
+        np.mean([s['hierarchical_params']['m_i_beta'][2] for s in samples])
+    ]
+    
+    m_gamma_final = [
+        np.mean([s['hierarchical_params']['m_gamma'][0] for s in samples]),
+        np.mean([s['hierarchical_params']['m_gamma'][1] for s in samples]),
+        np.mean([s['hierarchical_params']['m_gamma'][2] for s in samples])
+    ]
+    
+    sigma_beta_sq_final = np.mean([s['hierarchical_params']['sigma_beta_squared'] for s in samples])
+    sigma_gamma_sq_final = np.mean([s['hierarchical_params']['sigma_gamma_squared'] for s in samples])
+    sigma_sq_final = np.mean([s['hierarchical_params']['sigma_squared'] for s in samples])
+    
+    saved_files = {}
+    
+    # ========================================================================
+    # FIGURA 1: m_0β (3 parametri: D, μ, λ)
+    # Prior: m_0β|σ²_β ~ N(m_0_beta_means, σ²_β/e_β)
+    # ========================================================================
+    
+    print("\nCreating prior distributions with final values...")
+    print("="*80)
+    
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+    
+    param_names = ['D (capacity)', 'μ (growth rate)', 'λ (lag phase)']
+    colors = ['steelblue', 'darkorange', 'forestgreen']
+    
+    # Per il prior, usiamo una stima ragionevole di σ²_β
+    # (potremmo usare il valore finale, o un valore dal prior di σ²_β)
+    # Usiamo il valore atteso del prior di σ²_β: E[1/Gamma] ≈ d_beta2/(d_beta1-2)
+    if hyperparams['d_beta1'] > 2:
+        sigma_beta_sq_prior_mean = hyperparams['d_beta2'] / (hyperparams['d_beta1'] - 2)
+    else:
+        sigma_beta_sq_prior_mean = sigma_beta_sq_final  # fallback
+    
+    for idx, (name, final_val, color) in enumerate(zip(param_names, m_0_beta_final, colors)):
+        ax = axes[idx]
+        
+        # Prior distribution: N(m_0_beta_means[idx], sqrt(σ²_β/e_β))
+        prior_mean = hyperparams['m_0_beta_means'][idx]
+        prior_std = np.sqrt(sigma_beta_sq_prior_mean / hyperparams['e_beta'])
+        
+        # Disegna la campana gaussiana
+        x_range = np.linspace(prior_mean - 4*prior_std, prior_mean + 4*prior_std, 300)
+        prior_pdf = norm.pdf(x_range, prior_mean, prior_std)
+        
+        ax.plot(x_range, prior_pdf, linewidth=3, color=color, label='Prior distribution')
+        ax.fill_between(x_range, prior_pdf, alpha=0.3, color=color)
+        
+        # Marca il valore finale con un punto rosso
+        final_pdf_value = norm.pdf(final_val, prior_mean, prior_std)
+        ax.plot(final_val, final_pdf_value, 'o', color='red', markersize=12, 
+               label=f'Final value: {final_val:.3f}', zorder=10)
+        
+        # Linea verticale al valore finale
+        ax.axvline(final_val, color='red', linestyle='--', linewidth=2, alpha=0.7)
+        
+        # Marca anche la media del prior
+        ax.axvline(prior_mean, color=color, linestyle=':', linewidth=2, alpha=0.5,
+                  label=f'Prior mean: {prior_mean:.3f}')
+        
+        ax.set_xlabel(f'm_0β ({name})', fontsize=13, fontweight='bold')
+        ax.set_ylabel('Probability Density', fontsize=13)
+        ax.set_title(f'Prior Distribution: m_0β for {name}', fontsize=14, fontweight='bold')
+        ax.legend(fontsize=10, loc='best')
+        ax.grid(True, alpha=0.3)
+        
+        # Info box
+        shift = final_val - prior_mean
+        info_text = f'Prior: N({prior_mean:.3f}, {prior_std:.3f})\n'
+        info_text += f'Final: {final_val:.3f}\n'
+        info_text += f'Shift: {shift:+.3f}'
+        ax.text(0.02, 0.98, info_text, transform=ax.transAxes, 
+               fontsize=10, verticalalignment='top',
+               bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+    
+    plt.tight_layout()
+    path1 = os.path.join(save_path, "prior_m0beta_with_final.png")
+    plt.savefig(path1, dpi=300, bbox_inches='tight')
+    plt.close()
+    saved_files['m0_beta'] = path1
+    print(f"✓ m_0β: {path1}")
+    
+    # ========================================================================
+    # FIGURA 2: m_iβ (3 parametri: D, μ, λ)
+    # Prior: m_iβ|m_0β, σ²_β ~ N(m_0β, σ²_β/c_β)
+    # ========================================================================
+    
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+    
+    for idx, (name, final_val, color) in enumerate(zip(param_names, m_i_beta_final, colors)):
+        ax = axes[idx]
+        
+        # Per il prior usiamo m_0β finale come centro
+        prior_mean = m_0_beta_final[idx]
+        prior_std = np.sqrt(sigma_beta_sq_prior_mean / hyperparams['c_beta'])
+        
+        x_range = np.linspace(prior_mean - 4*prior_std, prior_mean + 4*prior_std, 300)
+        prior_pdf = norm.pdf(x_range, prior_mean, prior_std)
+        
+        ax.plot(x_range, prior_pdf, linewidth=3, color=color, label='Prior distribution')
+        ax.fill_between(x_range, prior_pdf, alpha=0.3, color=color)
+        
+        final_pdf_value = norm.pdf(final_val, prior_mean, prior_std)
+        ax.plot(final_val, final_pdf_value, 'o', color='red', markersize=12, 
+               label=f'Final value: {final_val:.3f}', zorder=10)
+        
+        ax.axvline(final_val, color='red', linestyle='--', linewidth=2, alpha=0.7)
+        ax.axvline(prior_mean, color=color, linestyle=':', linewidth=2, alpha=0.5,
+                  label=f'Prior mean: {prior_mean:.3f}')
+        
+        ax.set_xlabel(f'm_iβ ({name})', fontsize=13, fontweight='bold')
+        ax.set_ylabel('Probability Density', fontsize=13)
+        ax.set_title(f'Prior Distribution: m_iβ for {name}', fontsize=14, fontweight='bold')
+        ax.legend(fontsize=10, loc='best')
+        ax.grid(True, alpha=0.3)
+        
+        shift = final_val - prior_mean
+        info_text = f'Prior: N({prior_mean:.3f}, {prior_std:.3f})\n'
+        info_text += f'Final: {final_val:.3f}\n'
+        info_text += f'Shift: {shift:+.3f}'
+        ax.text(0.02, 0.98, info_text, transform=ax.transAxes, 
+               fontsize=10, verticalalignment='top',
+               bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+    
+    plt.tight_layout()
+    path2 = os.path.join(save_path, "prior_mibeta_with_final.png")
+    plt.savefig(path2, dpi=300, bbox_inches='tight')
+    plt.close()
+    saved_files['mi_beta'] = path2
+    print(f"✓ m_iβ: {path2}")
+    
+    # ========================================================================
+    # FIGURA 3: m_γ (3 parametri per i 3 input)
+    # Prior: m_γ|σ²_γ ~ N(0, σ²_γ/c_γ)
+    # ========================================================================
+    
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+    
+    input_names = ['Duty Cycle', 'Temperature', 'Frequency']
+    
+    if hyperparams['d_gamma1'] > 2:
+        sigma_gamma_sq_prior_mean = hyperparams['d_gamma2'] / (hyperparams['d_gamma1'] - 2)
+    else:
+        sigma_gamma_sq_prior_mean = sigma_gamma_sq_final
+    
+    for idx, (name, final_val, color) in enumerate(zip(input_names, m_gamma_final, colors)):
+        ax = axes[idx]
+        
+        # Prior: N(0, sqrt(σ²_γ/c_γ))
+        prior_mean = 0.0
+        prior_std = np.sqrt(sigma_gamma_sq_prior_mean / hyperparams['c_gamma'])
+        
+        x_range = np.linspace(prior_mean - 4*prior_std, prior_mean + 4*prior_std, 300)
+        prior_pdf = norm.pdf(x_range, prior_mean, prior_std)
+        
+        ax.plot(x_range, prior_pdf, linewidth=3, color=color, label='Prior distribution')
+        ax.fill_between(x_range, prior_pdf, alpha=0.3, color=color)
+        
+        final_pdf_value = norm.pdf(final_val, prior_mean, prior_std)
+        ax.plot(final_val, final_pdf_value, 'o', color='red', markersize=12, 
+               label=f'Final value: {final_val:.3f}', zorder=10)
+        
+        ax.axvline(final_val, color='red', linestyle='--', linewidth=2, alpha=0.7)
+        ax.axvline(prior_mean, color=color, linestyle=':', linewidth=2, alpha=0.5,
+                  label=f'Prior mean: {prior_mean:.3f}')
+        
+        ax.set_xlabel(f'm_γ ({name})', fontsize=13, fontweight='bold')
+        ax.set_ylabel('Probability Density', fontsize=13)
+        ax.set_title(f'Prior Distribution: m_γ for {name}', fontsize=14, fontweight='bold')
+        ax.legend(fontsize=10, loc='best')
+        ax.grid(True, alpha=0.3)
+        
+        shift = final_val - prior_mean
+        info_text = f'Prior: N({prior_mean:.3f}, {prior_std:.3f})\n'
+        info_text += f'Final: {final_val:.3f}\n'
+        info_text += f'Shift: {shift:+.3f}'
+        ax.text(0.02, 0.98, info_text, transform=ax.transAxes, 
+               fontsize=10, verticalalignment='top',
+               bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+    
+    plt.tight_layout()
+    path3 = os.path.join(save_path, "prior_mgamma_with_final.png")
+    plt.savefig(path3, dpi=300, bbox_inches='tight')
+    plt.close()
+    saved_files['m_gamma'] = path3
+    print(f"✓ m_γ: {path3}")
+    
+    # ========================================================================
+    # FIGURA 4: Varianze (σ²_β, σ²_γ, σ²)
+    # Prior: precision ~ Gamma(d/2, d2/2), quindi σ² = 1/precision
+    # ========================================================================
+    
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+
+    variance_names = ['σ²_β (beta weights)', 'σ²_γ (gamma weights)', 'σ² (error model)']
+    variance_finals = [sigma_beta_sq_final, sigma_gamma_sq_final, sigma_sq_final]
+    variance_colors = ['purple', 'crimson', 'teal']
+
+    prior_params = [
+        (hyperparams['d_beta1'], hyperparams['d_beta2']),
+        (hyperparams['d_gamma1'], hyperparams['d_gamma2']),
+        (hyperparams['a'], hyperparams['b'])
+    ]
+
+    for idx, (name, final_val, color, (d1, d2)) in enumerate(zip(variance_names, variance_finals, variance_colors, prior_params)):
+        ax = axes[idx]
+        
+        # Prior: precision ~ Gamma(d1/2, d2/2), quindi σ² = 1/precision
+        precision_samples = scipy_gamma.rvs(d1/2, scale=2/d2, size=50000)
+        variance_samples = 1.0 / precision_samples
+        
+        # KDE per curva smooth
+        from scipy.stats import gaussian_kde
+        kde = gaussian_kde(variance_samples)
+        
+        # SOLO PER IL SECONDO GRAFICO (σ²_γ) - range fisso 0-1000
+        if idx == 1:  # σ²_γ (gamma weights)
+            x_min = 0
+            x_max = 1000
+            x_range = np.linspace(x_min, x_max, 2000)
+        else:
+            # PRIMO E TERZO GRAFICO: lascia come prima
+            x_min = 0
+            x_max = np.percentile(variance_samples, 99)
+            x_range = np.linspace(x_min, x_max, 500)
+        
+        prior_pdf = kde(x_range)
+        
+        # Disegna la curva
+        ax.plot(x_range, prior_pdf, linewidth=3, color=color, label='Prior distribution')
+        ax.fill_between(x_range, prior_pdf, alpha=0.3, color=color)
+        
+        # Punto rosso al valore finale
+        final_pdf_value = kde.evaluate([final_val])[0]
+        ax.plot(final_val, final_pdf_value, 'o', color='red', markersize=10, 
+            label=f'Final value: {final_val:.4f}', zorder=10)
+        ax.axvline(final_val, color='red', linestyle='--', linewidth=2, alpha=0.7)
+        
+        # Media del prior
+        prior_mean = np.mean(variance_samples)
+        ax.axvline(prior_mean, color=color, linestyle=':', linewidth=2, alpha=0.5,
+                label=f'Prior mean: {prior_mean:.4f}')
+        
+        ax.set_xlabel(name, fontsize=13, fontweight='bold')
+        ax.set_ylabel('Probability Density', fontsize=13)
+        ax.set_title(f'Prior Distribution: {variance_names[idx].split("(")[0].strip()}', 
+                    fontsize=14, fontweight='bold')
+        ax.legend(fontsize=10, loc='best')
+        ax.grid(True, alpha=0.3)
+        
+        shift = final_val - prior_mean
+        info_text = f'Prior mean: {prior_mean:.4f}\n'
+        info_text += f'Final: {final_val:.4f}\n'
+        info_text += f'Shift: {shift:+.4f}'
+        ax.text(0.02, 0.98, info_text, transform=ax.transAxes, 
+            fontsize=10, verticalalignment='top',
+            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+        
+        ax.set_xlim(x_min, x_max)
+
+    plt.tight_layout()
+    path4 = os.path.join(save_path, "prior_variances_with_final.png")
+    plt.savefig(path4, dpi=300, bbox_inches='tight')
+    plt.close()
+    saved_files['variances'] = path4
+    print(f"✓ Variances: {path4}")
+    
+    # ========================================================================
+    # FIGURA 5: Error Model (distribuzione dell'errore)
+    # Il modello di errore è: ε ~ N(0, σ²×g(t)^0.5)
+    # Visualizziamo la distribuzione di σ² (già fatto) e mostriamo l'effetto
+    # ========================================================================
+    
+    # Nota: L'error_dist nel codice non è un parametro da salvare/visualizzare direttamente
+    # perché dipende da σ² e dal valore predetto g(t)
+    # Quello che possiamo visualizzare è come σ² (il parametro base) è cambiato
+    # Questo è già fatto nella Figura 4 (terzo subplot)
+    
+    # Però possiamo fare un grafico separato più dettagliato per σ² con interpretazione
+    fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+    
+    d1, d2 = hyperparams['a'], hyperparams['b']
+    
+    # Prior: precision ~ Gamma(a/2, b/2), quindi σ² = 1/precision
+    precision_samples = scipy_gamma.rvs(d1/2, scale=2/d2, size=50000)
+    variance_samples = 1.0 / precision_samples
+    
+    # KDE per curva smooth
+    from scipy.stats import gaussian_kde
+    kde = gaussian_kde(variance_samples)
+    
+    # Range per il plot - SEMPRE mostra bene la forma del prior
+    x_min = 0
+    x_max = np.percentile(variance_samples, 95)
+    
+    x_range = np.linspace(x_min, x_max, 500)
+    prior_pdf = kde(x_range)
+    
+    # Disegna la curva smooth
+    ax.plot(x_range, prior_pdf, linewidth=3, color='teal', label='Prior distribution')
+    ax.fill_between(x_range, prior_pdf, alpha=0.3, color='teal')
+    
+    # Punto rosso al valore finale
+    if sigma_sq_final <= x_max:
+        final_pdf_value = kde(sigma_sq_final)[0]
+        ax.plot(sigma_sq_final, final_pdf_value, 'o', color='red', markersize=12, 
+               label=f'Final value: {sigma_sq_final:.4f}', zorder=10)
+        ax.axvline(sigma_sq_final, color='red', linestyle='--', linewidth=2.5, alpha=0.7)
+    else:
+        ax.axvline(x_max * 0.98, color='red', linestyle='--', linewidth=2.5, alpha=0.7)
+        ax.annotate(f'Final: {sigma_sq_final:.4f}\n(off scale →)', 
+                   xy=(x_max * 0.95, ax.get_ylim()[1] * 0.7),
+                   fontsize=11, color='red', fontweight='bold',
+                   bbox=dict(boxstyle='round', facecolor='yellow', alpha=0.8, edgecolor='red', linewidth=2),
+                   ha='right')
+    
+    prior_mean = np.mean(variance_samples)
+    ax.axvline(prior_mean, color='teal', linestyle=':', linewidth=2.5, alpha=0.7,
+              label=f'Prior mean: {prior_mean:.4f}')
+    
+    ax.set_xlabel('σ² (Error Model Variance)', fontsize=14, fontweight='bold')
+    ax.set_ylabel('Probability Density', fontsize=14)
+    ax.set_title('Prior Distribution: Error Model Variance σ²\nε ~ N(0, σ²×g(t)^0.5)', 
+                fontsize=15, fontweight='bold')
+    ax.legend(fontsize=12, loc='best')
+    ax.grid(True, alpha=0.3)
+    
+    # Limita asse x - sempre mostra bene il prior
+    ax.set_xlim(x_min, x_max)
+    
+    shift = sigma_sq_final - prior_mean
+    info_text = f'Prior: 1/Gamma({d1/2:.1f}, {d2/2:.2f})\n'
+    info_text += f'Prior mean: {prior_mean:.4f}\n'
+    info_text += f'Final σ²: {sigma_sq_final:.4f}\n'
+    info_text += f'Shift: {shift:+.4f}\n'
+    if sigma_sq_final > x_max:
+        info_text += '(off scale)\n'
+    info_text += f'\nError model:\nε ~ N(0, σ²×g(t)^0.5)\n'
+    info_text += f'where g(t) is the\nGompertz prediction'
+    
+    ax.text(0.98, 0.97, info_text, transform=ax.transAxes, 
+           fontsize=11, verticalalignment='top', horizontalalignment='right',
+           bbox=dict(boxstyle='round', facecolor='lightcyan', alpha=0.9))
+    
+    plt.tight_layout()
+    path5 = os.path.join(save_path, "prior_error_model_with_final.png")
+    plt.savefig(path5, dpi=300, bbox_inches='tight')
+    plt.close()
+    saved_files['error_model'] = path5
+    print(f"✓ Error Model (σ²): {path5}")
+    
+    # ========================================================================
+    # SUMMARY
+    # ========================================================================
+    
+    print("\n" + "="*80)
+    print("PRIOR DISTRIBUTIONS WITH BAYESIAN ESTIMATES")
+    print("="*80)
+    print("\nInterpretazione:")
+    print("  - La curva mostra la distribuzione prior (credenza iniziale)")
+    print("  - Il punto rosso mostra la MEDIA POSTERIOR (stima bayesiana finale)")
+    print("  - La media integra su tutta la posterior, non è solo il MAP")
+    print("  - Lo 'Shift' indica quanto abbiamo imparato dai dati")
+    print("\nSe il punto rosso è:")
+    print("  - Vicino al centro della campana → I dati confermano il prior")
+    print("  - Lontano dal centro → I dati hanno aggiornato significativamente il prior")
+    print("\nFiles created:")
+    for key, path in saved_files.items():
+        print(f"  - {key}: {path}")
+    print("\nNote:")
+    print("  - L'error model completo è: ε ~ N(0, σ²×g(t)^0.5)")
+    print("  - Il grafico 'error_model' mostra la distribuzione di σ² (parametro base)")
+    print("="*80 + "\n")
+    
+    return saved_files
+
 
 
 if __name__ == '__main__':
@@ -1008,6 +1533,9 @@ if __name__ == '__main__':
         divide_train_test_result = divide_train_test(all_data)
         observed_data = divide_train_test_result['observed']
         test_data = divide_train_test_result['test']
+        #observed_data = all_data
+        #test_data = []
+
   
     load_result = model.load_model('/app/dataset_conf/model.pkl')
     if load_result['success']:
@@ -1016,18 +1544,43 @@ if __name__ == '__main__':
         mse = test_train(test_data, model)
         current_mse=mse  
         print(f"Mean Square Error (MSE): {mse:.4f}")
+        data1=[(0,8.18), (17, 12.528), (20, 12.112), (24, 12.76), (37, 12.653), (48, 12.507)]
+
+        prediction_batch=[{'environmental':[0, normalize(25.3, 18, 28), normalize(0, 0, 40)], 'time': 0, 'initial_pop': 8.18},
+                          {'environmental':[0, normalize(26.2, 18, 28), normalize(0, 0, 40)], 'time': 17, 'initial_pop': 8.18},
+                          {'environmental':[0, normalize(25.3, 18, 28), normalize(0, 0, 40)], 'time': 20, 'initial_pop': 8.18},
+                          {'environmental':[0, normalize(25.5, 18, 28), normalize(0, 0, 40)], 'time': 24, 'initial_pop': 8.18},
+                          {'environmental':[0, normalize(25.3, 18, 28), normalize(0, 0, 40)], 'time': 37, 'initial_pop': 8.18},
+                          {'environmental':[0, normalize(25.3, 18, 28), normalize(0, 0, 40)], 'time': 48, 'initial_pop': 8.18}]
+
+        results=[]
+
+        for i, test in enumerate(prediction_batch):
+            env_data = test['environmental']
+            t = test['time']
+            N_0 = test['initial_pop']
+            
+            pred_result = model.predict(env_data, t, N_0)
+                
+            prediction = pred_result['result']
+            pred_mean = prediction['gompertz']['mean']
+            results.append((t, pred_mean, prediction['gompertz']['std']))
+        
+        plot_optical_density_with_uncertainty(data1=data1, data2=results)
+        plot_prior_with_final_values(model)
+
         
 
     elif(len(all_data)>0):
         print("Training a new model")
         
         mcmc_params = {
-            'num_samples': 200000,
+            'num_samples': 300000,
             'burn_in': 100000,
             'thin': 1000
         }
 
-        model = Model(observed_data=observed_data, M=3, mcmc_params=mcmc_params)
+        model = Model(observed_data=observed_data, M=4, mcmc_params=mcmc_params)
         
         fit_result = model.fit()
         if not fit_result['success']:

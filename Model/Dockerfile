@@ -4,7 +4,7 @@ RUN apt-get update && apt-get install -y gcc g++ libgomp1 && rm -rf /var/lib/apt
 RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir --no-deps Flask Werkzeug Jinja2 itsdangerous click MarkupSafe
 RUN pip install --no-cache-dir --ignore-installed blinker
-RUN pip install --no-cache-dir tensorflow-probability==0.23.0 matplotlib
+RUN pip install --no-cache-dir tensorflow-probability==0.23.0 matplotlib scipy
 COPY . .
 EXPOSE 5001
 ENV TF_FORCE_GPU_ALLOW_GROWTH=true
