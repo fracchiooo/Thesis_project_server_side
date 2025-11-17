@@ -687,7 +687,7 @@ def divide_train_test(all_data):
     return {'observed': observed_data, 'test': test_data}
 
 
-def test_train(test_data, model):
+def test_train(test_data, model, save_path="/app/dataset_conf"):
     if test_data is None or len(test_data) == 0:
         logger.info("No test data provided.")
         return 0.0
@@ -695,6 +695,8 @@ def test_train(test_data, model):
     errors = []
     absolute_errors = []
     predictions_list = []
+    observed_values = []
+    predicted_values = []
 
     logger.info("\n=== TEST SET PREDICTIONS ===")
     for i, test in enumerate(test_data):
@@ -720,6 +722,10 @@ def test_train(test_data, model):
             'error': percent_error
         })
         
+        # Salva i valori per i plot
+        observed_values.append(N_obs)
+        predicted_values.append(pred_mean)
+        
         logger.info(f"\nTest {i+1}:")
         logger.info(f"  Predicted: {pred_mean:.4f} ± {prediction['gompertz']['std']:.4f}")
         logger.info(f"  Observed: {N_obs:.4f}")
@@ -738,6 +744,62 @@ def test_train(test_data, model):
     logger.info(f"Errors < 5%: {sum(e < 5 for e in errors)}/{len(errors)}")
     logger.info(f"Errors < 10%: {sum(e < 10 for e in errors)}/{len(errors)}")
 
+    # PLOT 1: Distribuzione degli errori (KDE - Kernel Density Estimation)
+    from scipy import stats
+    
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    # Crea una distribuzione continua usando KDE
+    density = stats.gaussian_kde(errors)
+    x_range = np.linspace(min(errors), max(errors), 200)
+    ax.plot(x_range, density(x_range), linewidth=2, color='steelblue')
+    ax.fill_between(x_range, density(x_range), alpha=0.3, color='steelblue')
+    
+    mean_error = np.mean(errors)
+    median_error = np.median(errors)
+    
+    # Linee verticali per media e mediana
+    ax.axvline(mean_error, color='red', linestyle='--', linewidth=2, label=f'Mean: {mean_error:.2f}%')
+    ax.axvline(median_error, color='green', linestyle='--', linewidth=2, label=f'Median: {median_error:.2f}%')
+    
+    ax.set_xlabel('Percentage Error (%)', fontsize=12)
+    ax.set_ylabel('Density', fontsize=12)
+    ax.set_title('Error Distribution', fontsize=14, fontweight='bold')
+    ax.legend(fontsize=11)
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    
+    full_path = os.path.join(save_path, "error_distribution.png")
+    plt.savefig(full_path, dpi=300, bbox_inches='tight')
+    plt.close()    
+    
+    # PLOT 2: Observed vs Predicted
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    # Scatter plot: observed vs predicted
+    ax.scatter(observed_values, predicted_values, color='blue', s=80, alpha=0.6, edgecolors='black', linewidth=0.5)
+    
+    # Linea ideale y=x (predizione perfetta)
+    min_val = min(min(observed_values), min(predicted_values))
+    max_val = max(max(observed_values), max(predicted_values))
+    ax.plot([min_val, max_val], [min_val, max_val], 'r--', linewidth=2, label='Perfect prediction', alpha=0.7)
+    
+    # Linee tratteggiate che connettono ogni punto alla linea ideale
+    for obs, pred in zip(observed_values, predicted_values):
+        ax.plot([obs, obs], [obs, pred], 'k--', alpha=0.3, linewidth=1, zorder=1)
+    
+    ax.set_xlabel('Observed Optical Density', fontsize=12)
+    ax.set_ylabel('Predicted Optical Density', fontsize=12)
+    ax.set_title('Observed vs Predicted Values', fontsize=14, fontweight='bold')
+    ax.legend(fontsize=11)
+    ax.grid(True, alpha=0.3)
+    ax.set_aspect('equal', adjustable='box')
+    plt.tight_layout()
+    
+    full_path = os.path.join(save_path, "observed_vs_predicted.png")
+    plt.savefig(full_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    
     mse = np.mean([e**2 for e in absolute_errors])
     return mse
 
@@ -912,7 +974,7 @@ def train():
             mcmc_params = {
                 'num_samples': 300000,
                 'burn_in': 100000,
-                'thin': 1000
+                'thin': 500
             }
             model.update_trainset_and_params(new_observed_data, mcmc_params)
             fit_result = model.fit()
@@ -1006,15 +1068,16 @@ def plot_optical_density_with_uncertainty(data1, data2=None,
                                           filename="optical_density_with_uncertainty.png", 
                                           save_path="/app/dataset_conf"):
     """
-    Disegna il grafico della densità ottica con banda di confidenza.
+    Disegna il grafico della densità ottica con intervallo di credibilità al 95%.
     
     Parameters:
     -----------
     data1 : list of tuples
         Lista di coppie (tempo, densità_ottica) per il primo dataset (dati reali)
     data2 : list of tuples, optional
-        Lista di triple (tempo, densità_ottica, std_dev) per il secondo dataset (predizioni)
-        Se presente, disegna anche la banda di confidenza (mean ± 2*std)
+        Lista di triple (tempo, densità_ottica_media, quantili) per il secondo dataset (predizioni)
+        dove quantili = [2.5%, 25%, 50%, 75%, 97.5%]
+        Se presente, disegna anche l'intervallo di credibilità al 95% (quantili 2.5%-97.5%)
     label1 : str
         Etichetta per il primo dataset
     label2 : str
@@ -1046,33 +1109,25 @@ def plot_optical_density_with_uncertainty(data1, data2=None,
     
     # Se ci sono predizioni con incertezza
     if data2 is not None:
-        # Controlla se data2 contiene triple (time, density, std) o coppie (time, density)
+        # Controlla se data2 contiene triple (time, mean, quantiles)
         if len(data2[0]) == 3:
-            # Triple: (time, density, std_dev)
-            times2, od2, std_devs = zip(*data2)
-            times2 = np.array(times2)
-            od2 = np.array(od2)
-            std_devs = np.array(std_devs)
+            # Triple: (time, mean, quantiles_array)
+            times2 = np.array([item[0] for item in data2])
+            means = np.array([item[1] for item in data2])
+            quantiles_list = [item[2] for item in data2]
             
-            # Plot predizioni (linea centrale)
-            ax.plot(times2, od2, marker='s', linestyle='-', linewidth=2.5, 
+            # Estrai i quantili 2.5% e 97.5% per l'intervallo di credibilità al 95%
+            lower_bound = np.array([q[0] for q in quantiles_list])  # 2.5%
+            upper_bound = np.array([q[4] for q in quantiles_list])  # 97.5%
+            
+            # Plot predizioni (linea centrale - media)
+            ax.plot(times2, means, marker='s', linestyle='-', linewidth=2.5, 
                    label=label2, color='darkorange', markersize=6)
             
-            # Banda di confidenza al 95% (≈ mean ± 2*std)
-            lower_bound = od2 - 2 * std_devs
-            upper_bound = od2 + 2 * std_devs
-            
+            # Intervallo di credibilità al 95% (quantili 2.5% - 97.5%)
             ax.fill_between(times2, lower_bound, upper_bound, 
                            alpha=0.3, color='darkorange', 
-                           label='95% Confidence interval')
-            
-            # Banda più stretta al 68% (≈ mean ± 1*std) - opzionale
-            lower_bound_1std = od2 - std_devs
-            upper_bound_1std = od2 + std_devs
-            
-            ax.fill_between(times2, lower_bound_1std, upper_bound_1std, 
-                           alpha=0.4, color='orange', 
-                           label='68% Confidence interval')
+                           label='95% Credible interval')
             
         else:
             # Coppie: (time, density) - backward compatibility
@@ -1564,7 +1619,8 @@ if __name__ == '__main__':
                 
             prediction = pred_result['result']
             pred_mean = prediction['gompertz']['mean']
-            results.append((t, pred_mean, prediction['gompertz']['std']))
+            results.append((t, pred_mean, prediction['gompertz']['quantiles']))
+            #'quantiles': np.percentile(gompertz_preds, [2.5, 25, 50, 75, 97.5]) 
         
         plot_optical_density_with_uncertainty(data1=data1, data2=results)
         plot_prior_with_final_values(model)
@@ -1577,7 +1633,7 @@ if __name__ == '__main__':
         mcmc_params = {
             'num_samples': 300000,
             'burn_in': 100000,
-            'thin': 1000
+            'thin': 500
         }
 
         model = Model(observed_data=observed_data, M=4, mcmc_params=mcmc_params)
