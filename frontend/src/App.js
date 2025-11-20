@@ -11,7 +11,7 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 
 function App() {
   useEffect(() => {
-    document.body.style.backgroundColor = '#88c265';
+    document.body.style.backgroundColor = '#ffffffff';
   }, []);
 
   return (
