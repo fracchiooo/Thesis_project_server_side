@@ -24,10 +24,8 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onDelete }) => {
     });
     const [validationErrors, setValidationErrors] = useState<string[]>([]);
     
-    // Rimuovi virgolette extra dal deviceEUI se presenti
     const cleanDeviceEUI = device.deviceEUI?.replace(/^"|"$/g, '') || 'Unknown';
     
-    // Formatta la data
     const formatDate = (date?: string) => {
         if (!date) return 'N/A';
         try {
@@ -37,7 +35,6 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onDelete }) => {
         }
     };
 
-    // Converti ore, minuti, secondi in ore decimali
     const convertToDecimalHours = (hours: string, minutes: string, seconds: string): number => {
         const h = parseFloat(hours) || 0;
         const m = parseFloat(minutes) || 0;
@@ -59,14 +56,12 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onDelete }) => {
     const validateCommand = (): boolean => {
         const errors: string[] = [];
 
-        // Validazione campi obbligatori
         if (!commandData.frequency || !commandData.duty_frequency) {
             errors.push('Frequency and Duty Frequency are required');
             setValidationErrors(errors);
             return false;
         }
 
-        // Verifica che almeno uno dei campi tempo sia compilato
         const hasTime = commandData.finish_after_hours || 
                        commandData.finish_after_minutes || 
                        commandData.finish_after_seconds;
@@ -78,17 +73,14 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onDelete }) => {
         const frequency = parseFloat(commandData.frequency);
         const dutyFrequency = parseFloat(commandData.duty_frequency);
 
-        // Validazione range frequency (0-40 kHz)
         if (isNaN(frequency) || frequency < 0 || frequency > 40) {
             errors.push('Frequency must be between 0 and 40 kHz');
         }
 
-        // Validazione range duty_frequency (20-100)
         if (isNaN(dutyFrequency) || dutyFrequency < 20 || dutyFrequency > 100) {
             errors.push('Duty Frequency must be between 20 and 100');
         }
 
-        // Validazione finish_after (maggiore di 0)
         const finishAfterHours = convertToDecimalHours(
             commandData.finish_after_hours,
             commandData.finish_after_minutes,
@@ -99,7 +91,6 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onDelete }) => {
             errors.push('Total duration must be greater than 0');
         }
 
-        // Validazione valori negativi per tempo
         const hours = parseFloat(commandData.finish_after_hours) || 0;
         const minutes = parseFloat(commandData.finish_after_minutes) || 0;
         const seconds = parseFloat(commandData.finish_after_seconds) || 0;
@@ -116,7 +107,6 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onDelete }) => {
             errors.push('Seconds must be less than 60');
         }
 
-        // Validazione startTime (opzionale, ma se presente deve essere futura)
         if (commandData.startTime) {
             const startTime = new Date(commandData.startTime);
             const now = new Date();
@@ -136,7 +126,6 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onDelete }) => {
             return;
         }
 
-        // Validazione
         if (!validateCommand()) {
             return;
         }
@@ -147,7 +136,6 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onDelete }) => {
         try {
             setIsSending(true);
 
-            // Converti il tempo in ore decimali
             const finishAfterHours = convertToDecimalHours(
                 commandData.finish_after_hours,
                 commandData.finish_after_minutes,
@@ -160,7 +148,6 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onDelete }) => {
                 finish_after: finishAfterHours
             };
 
-            // Aggiungi startTime solo se specificato
             if (commandData.startTime) {
                 commandDto.startTime = new Date(commandData.startTime).toISOString();
             }
@@ -272,7 +259,7 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onDelete }) => {
                 </div>
             </div>
 
-            {/* Command Modal */}
+            {}
             {isCommandModalOpen && (
                 <div className="modal-overlay" onClick={handleCommandCancel}>
                     <div className="modal-content command-modal" onClick={(e) => e.stopPropagation()}>

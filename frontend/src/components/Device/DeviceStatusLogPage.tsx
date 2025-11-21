@@ -17,7 +17,6 @@ import {
 import 'chartjs-adapter-date-fns';
 import '../../CSS/device-status-log.css';
 
-// Registra i componenti di Chart.js
 ChartJS.register(
     CategoryScale,
     LinearScale,
@@ -47,7 +46,6 @@ const DeviceStatusLogPage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Date range - default ultimi 30 giorni
     const getDefaultDates = () => {
         const now = new Date();
         const thirtyDaysAgo = new Date();
@@ -82,13 +80,11 @@ const DeviceStatusLogPage = () => {
             const startDateObj = parseInputDate(startDate);
             const endDateObj = parseInputDate(endDate);
 
-            // Fetch tutti i log con un size molto grande
             let allFetchedLogs: DeviceStatusLog[] = [];
             let currentPage = 0;
             let totalPages = 1;
-            const pageSize = 1000; // Fetch 1000 log per volta
+            const pageSize = 1000;
 
-            // Continua a fetchare fino a quando non hai tutti i log
             while (currentPage < totalPages) {
                 const response = await axios.get(
                     `http://localhost:3000/device/getDeviceLogsPages/${deviceEUI}`,
@@ -126,7 +122,6 @@ const DeviceStatusLogPage = () => {
         fetchAllLogs();
     }, [startDate, endDate]);
 
-    // Prepara dati per il grafico della temperatura
     const temperatureChartData = {
         datasets: [
             {
@@ -143,7 +138,6 @@ const DeviceStatusLogPage = () => {
         ]
     };
 
-    // Prepara dati per il grafico della frequenza
     const frequencyChartData = {
         datasets: [
             {
@@ -160,7 +154,6 @@ const DeviceStatusLogPage = () => {
         ]
     };
 
-    // Opzioni per il grafico della temperatura
     const temperatureChartOptions = {
         responsive: true,
         maintainAspectRatio: false,
@@ -198,7 +191,6 @@ const DeviceStatusLogPage = () => {
         }
     };
 
-    // Opzioni per il grafico della frequenza (con beginAtZero: true)
     const frequencyChartOptions = {
         responsive: true,
         maintainAspectRatio: false,

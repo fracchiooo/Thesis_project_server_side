@@ -93,20 +93,17 @@ const DevicePage = () => {
         }
     }, [token]);
 
-    // Fetch iniziale
     useEffect(() => {
         fetchDevices();
     }, [fetchDevices]);
 
-    // Auto-refresh statuses ogni 30 secondi
     useEffect(() => {
         if (!autoRefresh) return;
 
         const interval = setInterval(() => {
             fetchStatuses();
-        }, 30000); // 30 secondi
+        }, 30000);
 
-        // Fetch immediato all'inizio
         fetchStatuses();
 
         return () => clearInterval(interval);

@@ -130,7 +130,7 @@ const PredictionCard: React.FC<PredictionCardProps> = ({
                         fontSize: '0.8em',
                         fontWeight: 'bold'
                     }}>
-                        ✓ Sent to Dataset
+                        Sent to Dataset
                     </span>
                 )}
             </div>

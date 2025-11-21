@@ -29,10 +29,9 @@ function App() {
   );
 }
 
-// HomePage è DENTRO il Router, quindi può usare useNavigate
 function HomePage() {
   const isLoggedIn = localStorage.getItem('authToken') != null;
-  const navigate = useNavigate(); // Ora funziona!
+  const navigate = useNavigate();
 
   const handleSignUp = () => {
     navigate('/signup');

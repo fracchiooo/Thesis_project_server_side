@@ -226,7 +226,6 @@
     color: #333;
 }
 
-/* Page Layout */
 .page-header {
     display: flex;
     justify-content: space-between;
@@ -248,7 +247,6 @@
     gap: 20px;
 }
 
-/* Create Button */
 .create-button {
     display: flex;
     align-items: center;
@@ -270,7 +268,6 @@
     box-shadow: 0 4px 8px rgba(136, 194, 101, 0.3);
 }
 
-/* Loading & Error States */
 .loading,
 .error {
     text-align: center;
@@ -283,7 +280,6 @@
     color: #f44336;
 }
 
-/* No Devices Message */
 .no-devices {
     text-align: center;
     padding: 60px 20px;
@@ -302,7 +298,6 @@
     color: #666;
 }
 
-/* Modal Styles */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -391,7 +386,6 @@
     background-color: #d0d0d0;
 }
 
-/* Responsive Design */
 @media (max-width: 768px) {
     .device-page-wrapper {
         padding: 16px;

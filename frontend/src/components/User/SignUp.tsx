@@ -11,7 +11,6 @@ const UserSubscription: React.FC = () => {
   const [isAuthorized, setIsAuthorized] = useState<boolean>(false);
 
   useEffect(() => {
-    // Check if authToken exists in localStorage
     const token = localStorage.getItem('authToken');
     if (token) {
       setIsAuthorized(true);
@@ -21,23 +20,19 @@ const UserSubscription: React.FC = () => {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    // Prepare the request body
     const body = {
       password,
       username,
     };
 
     try {
-      // Send POST request to create the user profile
       const response = await axios.post('http://localhost:3000/user/create', body);
       
-      // If successful, handle the success response
       setSuccessMessage(`Profile created successfully: ${JSON.stringify(response.data)}`);
       setError('');
       alert(`Profile ${username} created correctly!`);
       window.location.href = '/login';
     } catch (err: any) {
-      // Handle errors (e.g., "Profile already created")
       if (err.response && err.response.status === 406) {
         setError(`Error: ${err.response.data}`);
       } else {

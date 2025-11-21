@@ -10,7 +10,6 @@ const Login: React.FC = () => {
   const [isAuthorized, setIsAuthorized] = useState<boolean>(false);
 
   useEffect(() => {
-    // Check if authToken exists in localStorage
     const token = localStorage.getItem('authToken');
     if (token) {
       setIsAuthorized(true);
@@ -18,7 +17,7 @@ const Login: React.FC = () => {
   }, []);
 
   const handleLogin = async () => {
-    setError(null); // Reset error before making the request
+    setError(null);
 
     try {
       const response = await axios.post('http://localhost:3000/user/login', {
@@ -29,7 +28,7 @@ const Login: React.FC = () => {
       const jwtToken = response.data;
       if (jwtToken && typeof jwtToken === 'string') {
         const tokenPayload = JSON.parse(
-            atob(jwtToken.split('.')[1]) // Decode the base64 payload
+            atob(jwtToken.split('.')[1])
           );
       const expirationTime = tokenPayload.exp * 1000; 
       console.log("the expioration time is "+expirationTime);

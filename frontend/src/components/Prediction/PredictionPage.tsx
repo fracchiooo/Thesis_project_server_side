@@ -303,7 +303,7 @@ const PredictionPage = () => {
                 )}
             </div>
 
-            {/* Train Model Button */}
+            {}
             <div className="train-section">
                 <button 
                     className="train-button" 
@@ -334,7 +334,7 @@ const PredictionPage = () => {
                             <div className="validation-errors">
                                 {validationErrors.map((error, index) => (
                                     <div key={index} className="validation-error">
-                                        ⚠️ {error}
+                                        {error}
                                     </div>
                                 ))}
                             </div>

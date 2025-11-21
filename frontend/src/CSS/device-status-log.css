@@ -35,7 +35,6 @@
     background-color: #76a856;
 }
 
-/* Date Range Selector */
 .date-range-selector {
     display: flex;
     gap: 20px;
@@ -88,7 +87,6 @@
     background-color: #1976D2;
 }
 
-/* Charts Container */
 .charts-container {
     display: grid;
     grid-template-columns: 1fr;
@@ -114,7 +112,6 @@
     position: relative;
 }
 
-/* Pagination */
 .pagination {
     display: flex;
     justify-content: center;
@@ -153,7 +150,6 @@
     color: #555;
 }
 
-/* Logs Summary */
 .logs-summary {
     text-align: center;
     padding: 20px;
@@ -163,7 +159,6 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-/* No Data */
 .no-data {
     text-align: center;
     padding: 60px 20px;
@@ -184,7 +179,6 @@
     color: #666;
 }
 
-/* Loading & Error */
 .loading,
 .error {
     text-align: center;
@@ -197,7 +191,6 @@
     color: #f44336;
 }
 
-/* Responsive Design */
 @media (max-width: 768px) {
     .device-status-log-page {
         padding: 16px;
