@@ -8,9 +8,9 @@
 
 ## Setup Instructions
 
-### 1. EMQX Broker Configuration
+### 1. Broker Configuration
 
-- Sign up for the [EMQX Cloud](https://www.emqx.com/en/cloud) console service
+- Sign up for the broker cloud console service
 - Create a new deployment
 - Download the broker's CA certificate
 - Rename the certificate to `emqxsl-ca.crt`
@@ -18,15 +18,28 @@
 
 ### 2. Environment Configuration
 
+#### 2.1 Create Environment Variables File
+
 Create a `.env` file in the project root directory with the following key-value pairs:
 ```env
 MODEL_API_KEY=<your_secure_api_key_for_model_microservice>
 POSTGRESQL_PASSWORD=<your_database_password>
-MQTT_PASSWORD=<password_configured_in_emqx_authentication>
+MQTT_PASSWORD=<password_configured_in_broker_authentication>
 JWT_SECRET=<your_random_secure_string>
 ```
 
-**Note**: For the `MQTT_PASSWORD`, configure the EMQX broker's Authentication section with the username `thesis_yeastime`.
+
+**Note**: For the `MQTT_PASSWORD`, configure the broker's Authentication section with the username set in application.properties, by default is `thesis_yeastime`.
+
+#### 2.2 Configure Application Properties
+Edit the file `./Backend/src/main/resources/application.properties` and update the following properties:
+```properties
+spring.mqtt.host=<your_broker_url>
+spring.mqtt.username=<username_configured_in_broker_authentication>
+spring.datasource.password=<your_database_password>
+```
+
+
 
 ### 3. Dataset Preparation
 
@@ -65,3 +78,5 @@ http://localhost:80
 
 **Project**: Proof of Concept for a Digital Twin of an Ultrasonic Fermentation System  
 **Institution**: Sapienza University of Rome
+
+
